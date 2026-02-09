@@ -1,6 +1,6 @@
 import numpy as np
 
-def bilinear(image, x, y, nan=np.nan, periodic_x=False, periodic_y=False, **kwargs):
+def bilinear(image, x, y):
     nx, ny = image.shape
 
     x_ = np.nan_to_num(np.floor(x), nan=nx).astype(np.int16)
@@ -13,11 +13,6 @@ def bilinear(image, x, y, nan=np.nan, periodic_x=False, periodic_y=False, **kwar
             q = np.abs((1 - i - dx) * (1 - j - dy))
             xi, yj = x_ + i, y_ + j
             temp = image[xi % nx, yj % ny] * q
-
-            if not periodic_x:
-                temp[np.any([xi < 0,xi >= nx], axis=0)] = nan
-            if not periodic_y:
-                temp[np.any([yj < 0,yj >= ny], axis=0)] = nan
             image_ += temp
 
     return image_
