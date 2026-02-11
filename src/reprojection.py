@@ -112,7 +112,7 @@ class View:
         return transform
 
 
-def reproject(data, header, header_new=None, correct_mu=False, mu_thr=0, **kwargs):
+def reproject(data, header, header_new=None, **kwargs):
     '''
     Reprojects the data obtained from a view defined by 'header' to a view defined by 'header_new'.
 
@@ -133,7 +133,7 @@ def reproject(data, header, header_new=None, correct_mu=False, mu_thr=0, **kwarg
 
     view = View.from_header(header)
     view_new = View.from_header(header_).update(**kwargs)
-    transform = view_new.to_spherical(correct_mu=correct_mu) - view.to_spherical(correct_mu=correct_mu, mu_thr=mu_thr)
+    transform = view_new.to_spherical(**kwargs) - view.to_spherical(**kwargs)
 
     grid = np.mgrid[:view_new.nx, :view_new.ny]
     grid, alpha = transform(grid)
@@ -141,7 +141,7 @@ def reproject(data, header, header_new=None, correct_mu=False, mu_thr=0, **kwarg
     return data
 
 
-def remap(data, header, dlon=1, dlat=1, correct_mu=False, mu_thr=0, **kwargs):
+def remap(data, header, dlon=1, dlat=1, **kwargs):
     '''
     Remaps the data obtained from a view defined by 'header' to spherical (Carrington) coordinates.
 
@@ -156,7 +156,7 @@ def remap(data, header, dlon=1, dlat=1, correct_mu=False, mu_thr=0, **kwargs):
     '''
 
     view = View.from_header(header).update(**kwargs)
-    transform = ~view.to_spherical(correct_mu=correct_mu, mu_thr=mu_thr)
+    transform = ~view.to_spherical(**kwargs)
 
     grid = np.mgrid[-90:90 + dlat / 2:dlat, -180:180:dlon]
     grid, alpha = transform(grid)
