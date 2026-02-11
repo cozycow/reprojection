@@ -5,6 +5,21 @@ from transforms import *
 
 class View:
     def __init__(self, nx, ny, xc, yc, rsun, crota, crlt, crln, x0=0, y0=0):
+        '''
+        A WCS information container.
+
+        :param nx:
+        :param ny:
+        :param xc:
+        :param yc:
+        :param rsun:
+        :param crota:
+        :param crlt:
+        :param crln:
+        :param x0:
+        :param y0:
+        '''
+
         self.nx = nx
         self.ny = ny
         self.xc = xc
@@ -25,7 +40,7 @@ class View:
     @classmethod
     def from_header(cls, header):
         '''
-        Constructs a view using header information.
+        Reads WCS information from header.
 
         :param header:
         :return:
