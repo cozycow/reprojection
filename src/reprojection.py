@@ -4,7 +4,7 @@ from transforms import *
 
 
 class View:
-    def __init__(self, nx, ny, xc, yc, rsun, crota, crlt, crln, x0=0, y0=0):
+    def __init__(self, nx, ny, xc, yc, rsun, crota, crlt, crln, x0=0, y0=0, ww=0.985):
         '''
         A WCS information container.
 
@@ -18,6 +18,7 @@ class View:
         :param crln:
         :param x0:
         :param y0:
+        :param ww:
         '''
 
         self.nx = nx
@@ -30,10 +31,11 @@ class View:
         self.crln = crln % 360
         self.x0 = x0
         self.y0 = y0
+        self.ww = ww
 
     def update(self, **kwargs):
         for key, value in kwargs.items():
-            if key in ['nx', 'ny', 'xc', 'yc', 'rsun', 'crota', 'crlt', 'crln', 'x0', 'y0']:
+            if key in ['nx', 'ny', 'xc', 'yc', 'rsun', 'crota', 'crlt', 'crln', 'x0', 'y0', 'ww']:
                 setattr(self, key, value)
         return self
 
@@ -71,14 +73,22 @@ class View:
         else:
             crota = header['CROTA2']
 
-        return cls(nx, ny, xc, yc, rsun, crota, crlt, crln, x0, y0)
+        if 'OBS_VW' in header:
+            vw = header['OBS_VW'] ## Westward velocity
+            d_sun = header['DSUN_OBS'] ## Distance to the Sun
+            ww = vw / d_sun / np.pi * 180 * 24 * 60 * 60  ## Westward rotation rate in degrees per day
+        else:
+            ww = 0.985
 
-    def to_spherical(self, correct_mu=False, mu_thr=0):
+        return cls(nx, ny, xc, yc, rsun, crota, crlt, crln, x0, y0, ww)
+
+    def to_spherical(self, correct_mu=False, correct_dr=False, mu_thr=0):
         '''
         Constructs a transformation from image coordinates (in pixels) to Carrington coordinates (in degrees).
 
-        :param correct_mu:
-        :param mu_thr:
+        :param correct_mu: bool, True is mu-correction needs to be applied.
+        :param correct_dr: bool, True is differential rotation correction needs to be applied.
+        :param mu_thr: Threshold for mu-correction.
         :return:
         '''
 
@@ -93,6 +103,11 @@ class View:
                      Rotate.y(self.crlt * np.pi / 180) -
                      Rotate.x(self.crln * np.pi / 180) +
                      ToSpherical())
+
+        if correct_dr:
+            Wsid = 14.184
+            Wsyn = Wsid - self.ww
+            transform -= ToSynoptic(self.crln, Wsid=Wsid, Wsyn=Wsyn)
 
         return transform
 

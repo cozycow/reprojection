@@ -256,6 +256,38 @@ class ToSpherical(Transform):
         return ToSpherical(not self.inv)
 
 
+class ToSynoptic(Transform):
+
+    def __new__(cls, *args, **kwargs):
+        if len(kwargs) == 5 and all(value == 0 for value in kwargs.values()):
+            return Pipe()
+        else:
+            return super().__new__(cls)
+
+    def __init__(self, crln, A=14.712, B=-2.396, C=-1.787, Wsid=14.184, Wsyn=360 / 27.2753):
+        self.crln = crln
+        self.A = A
+        self.B = B
+        self.C = C
+        self.Wsid = Wsid
+        self.Wsyn = Wsyn
+
+    def __repr__(self):
+        return f'ToSynoptic(A:{self.A}, B:{self.B}, C:{self.C})'
+
+    def __call__(self, r, alpha=1):
+        theta, phi = r
+        sin_theta = np.sin(theta * np.pi / 180)
+
+        dW = self.A - self.Wsid + self.B * sin_theta ** 2 + self.C * sin_theta ** 4
+        dt = ((phi - self.crln - 180) % 360 - 180) / (self.Wsyn - dW)
+        dphi = dW * dt
+        return (theta, phi + dphi), alpha
+
+    def __invert__(self):
+        return type(self)(self.crln, A=self.A, B=self.B, C=self.C, Wsid=self.Wsid, Wsyn=-self.Wsyn)
+
+
 class Filter(Transform):
 
     def __init__(self, func, inv=False):
