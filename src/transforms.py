@@ -264,7 +264,7 @@ class ToSynoptic(Transform):
         else:
             return super().__new__(cls)
 
-    def __init__(self, crln, A=14.712, B=-2.396, C=-1.787, Wsid=14.184, Wsyn=360 / 27.2753):
+    def __init__(self, crln, A=14.712, B=-2.396, C=-1.787, Wsid=360 / 25.38, Wsyn=360 / 27.2753):
         self.crln = crln
         self.A = A
         self.B = B

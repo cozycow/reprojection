@@ -105,9 +105,9 @@ class View:
                      ToSpherical())
 
         if correct_dr:
-            Wsid = 14.184
+            Wsid = 360 / 25.38
             Wsyn = Wsid - self.ww
-            transform -= ToSynoptic(self.crln, Wsid=Wsid, Wsyn=Wsyn)
+            transform -= ToSynoptic(self.crln, Wsid=Wsid, Wsyn=Wsyn)#, A=14.416, B=-1.555, C=-2.265)
 
         return transform
 
