@@ -88,7 +88,7 @@ class View:
 
         return cls(nx, ny, xc, yc, rsun, crota, crlt, crln, hgln, x0, y0, ww)
 
-    def to_spherical(self, correct_mu=False, correct_dr=False, mu_thr=0):
+    def to_spherical(self, correct_mu=False, correct_dr=False, mu_thr=0, **kwargs):
         '''
         Constructs a transformation from image coordinates (in pixels) to Carrington coordinates (in degrees).
 
