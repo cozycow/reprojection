@@ -4,7 +4,7 @@ from transforms import *
 
 
 class View:
-    def __init__(self, nx, ny, xc, yc, rsun, crota, crlt, crln, x0=0, y0=0, ww=0.985):
+    def __init__(self, nx, ny, xc, yc, rsun, crota, crlt, crln, hgln=0, x0=0, y0=0, ww=0.9856):
         '''
         A WCS information container.
 
@@ -29,13 +29,14 @@ class View:
         self.crota = crota
         self.crlt = crlt
         self.crln = crln % 360
+        self.hgln = hgln % 360
         self.x0 = x0
         self.y0 = y0
         self.ww = ww
 
     def update(self, **kwargs):
         for key, value in kwargs.items():
-            if key in ['nx', 'ny', 'xc', 'yc', 'rsun', 'crota', 'crlt', 'crln', 'x0', 'y0', 'ww']:
+            if key in ['nx', 'ny', 'xc', 'yc', 'rsun', 'crota', 'crlt', 'crln', 'hgln', 'x0', 'y0', 'ww']:
                 setattr(self, key, value)
         return self
 
@@ -73,14 +74,19 @@ class View:
         else:
             crota = header['CROTA2']
 
+        if 'HGLN_OBS' in header:
+            hgln = header['HGLN_OBS']
+        else:
+            hgln = 0
+
         if 'OBS_VW' in header:
             vw = header['OBS_VW'] ## Westward velocity
             d_sun = header['DSUN_OBS'] ## Distance to the Sun
             ww = vw / d_sun / np.pi * 180 * 24 * 60 * 60  ## Westward rotation rate in degrees per day
         else:
-            ww = 0.985
+            ww = 0.9856
 
-        return cls(nx, ny, xc, yc, rsun, crota, crlt, crln, x0, y0, ww)
+        return cls(nx, ny, xc, yc, rsun, crota, crlt, crln, hgln, x0, y0, ww)
 
     def to_spherical(self, correct_mu=False, correct_dr=False, mu_thr=0):
         '''
@@ -107,7 +113,9 @@ class View:
         if correct_dr:
             Wsid = 360 / 25.38
             Wsyn = Wsid - self.ww
-            transform -= ToSynoptic(self.crln, Wsid=Wsid, Wsyn=Wsyn)#, A=14.416, B=-1.555, C=-2.265)
+            crln0 = self.crln - self.hgln
+
+            transform -= ToSynoptic(crln0, Wsid=Wsid, Wsyn=Wsyn)#, A=14.252, B=-1.678, C=-2.401)
 
         return transform
 

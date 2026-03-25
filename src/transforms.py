@@ -240,7 +240,6 @@ class ToSpherical(Transform):
             theta = np.arcsin(x) * 180 / np.pi
             phi = np.arctan2(y, z) * 180 / np.pi
             phi = phi % 360
-
             return (theta, phi), alpha
         else:
             theta, phi = r
@@ -264,13 +263,14 @@ class ToSynoptic(Transform):
         else:
             return super().__new__(cls)
 
-    def __init__(self, crln, A=14.712, B=-2.396, C=-1.787, Wsid=360 / 25.38, Wsyn=360 / 27.2753):
+    def __init__(self, crln, A=14.712, B=-2.396, C=-1.787, Wsid=360 / 25.38, Wsyn=360 / 27.2753, inv=False):
         self.crln = crln
         self.A = A
         self.B = B
         self.C = C
         self.Wsid = Wsid
         self.Wsyn = Wsyn
+        self.inv = inv
 
     def __repr__(self):
         return f'ToSynoptic(A:{self.A}, B:{self.B}, C:{self.C})'
@@ -279,13 +279,18 @@ class ToSynoptic(Transform):
         theta, phi = r
         sin_theta = np.sin(theta * np.pi / 180)
 
-        dW = self.A - self.Wsid + self.B * sin_theta ** 2 + self.C * sin_theta ** 4
-        dt = ((phi - self.crln - 180) % 360 - 180) / (self.Wsyn - dW)
-        dphi = dW * dt
-        return (theta, phi + dphi), alpha
+        W = self.A + self.B * sin_theta ** 2 + self.C * sin_theta ** 4
+        Wobs = self.Wsid - self.Wsyn
+
+        q = 1 - (W - self.Wsid) / (W - Wobs)
+        if not self.inv:
+            q = 1 / q
+
+        phi0 = (phi - self.crln - 180) % 360 - 180
+        return (theta, phi0 * q + self.crln), alpha
 
     def __invert__(self):
-        return type(self)(self.crln, A=self.A, B=self.B, C=self.C, Wsid=self.Wsid, Wsyn=-self.Wsyn)
+        return type(self)(self.crln, A=self.A, B=self.B, C=self.C, Wsid=self.Wsid, Wsyn=self.Wsyn, inv=not self.inv)
 
 
 class Filter(Transform):
