@@ -34,10 +34,13 @@ class View:
         self.y0 = y0
         self.ww = ww
 
-    def update(self, **kwargs):
+    def update(self, increment=False, **kwargs):
         for key, value in kwargs.items():
             if key in ['nx', 'ny', 'xc', 'yc', 'rsun', 'crota', 'crlt', 'crln', 'hgln', 'x0', 'y0', 'ww']:
-                setattr(self, key, value)
+                if increment:
+                    setattr(self, key, getattr(self, key) + value)
+                else:
+                    setattr(self, key, value)
         return self
 
     @classmethod
@@ -88,7 +91,7 @@ class View:
 
         return cls(nx, ny, xc, yc, rsun, crota, crlt, crln, hgln, x0, y0, ww)
 
-    def to_spherical(self, correct_mu=False, correct_dr=False, mu_thr=0, **kwargs):
+    def to_spherical(self, correct_mu=False, correct_dr=False, stonyhurst=False, mu_thr=0, **kwargs):
         '''
         Constructs a transformation from image coordinates (in pixels) to Carrington coordinates (in degrees).
 
@@ -113,7 +116,9 @@ class View:
         if correct_dr:
             Wsid = 360 / 25.38
             Wsyn = Wsid - self.ww
-            crln0 = self.crln - self.hgln
+            crln0 = self.crln
+            if stonyhurst:
+                crln0 -= self.hgln
 
             transform -= ToSynoptic(crln0, Wsid=Wsid, Wsyn=Wsyn)#, A=14.252, B=-1.678, C=-2.401)
 

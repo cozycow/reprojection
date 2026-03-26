@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def bilinear(image, x, y):
     nx, ny = image.shape
 
