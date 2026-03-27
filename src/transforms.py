@@ -286,8 +286,9 @@ class ToSynoptic(Transform):
         if not self.inv:
             q = 1 / q
 
-        phi0 = (phi - self.crln - 180) % 360 - 180
-        return (theta, phi0 * q + self.crln), alpha
+        dphi = (phi - self.crln - 180) % 360 - 180
+        #dphi = (phi - self.crln) % 360 - 360
+        return (theta, dphi * q + self.crln), alpha
 
     def __invert__(self):
         return type(self)(self.crln, A=self.A, B=self.B, C=self.C, Wsid=self.Wsid, Wsyn=self.Wsyn, inv=not self.inv)

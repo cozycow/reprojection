@@ -19,11 +19,16 @@ def rebin(image, k, axis=None, update_header=None):
         return rebin(rebin(image, k, axis=0, update_header=update_header), k, axis=1, update_header=update_header)
 
 
-def hmize(image, fdt, hmi):
+def hmize(image, psf=None, fdt=None, hmi=None):
     from interpolation import interpolate
-    image_ = image.copy().flatten()
-    image_ = interpolate(hmi, fdt, image_)
-    return image_.reshape(image.shape)
+    from scipy.signal import convolve2d
+
+    image_ = image.copy()
+    if psf is not None:
+        image_ = convolve2d(image_, psf, 'same')
+    if fdt is not None and hmi is not None:
+        image_ = interpolate(hmi, fdt, image_.flatten()).reshape(image.shape)
+    return image_
 
 
 def undistort(image, header, xd, yd):
