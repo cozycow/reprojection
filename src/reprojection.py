@@ -115,12 +115,15 @@ class View:
 
         if correct_dr:
             Wsid = 360 / 25.38
-            Wsyn = Wsid - self.ww
-            crln0 = self.crln
-            if stonyhurst:
-                crln0 -= self.hgln
 
-            transform -= ToSynoptic(crln0, Wsid=Wsid, Wsyn=Wsyn)#, A=14.252, B=-1.678, C=-2.401)
+            if stonyhurst:
+                crln0 = self.crln - self.hgln
+                Wsyn = 360 / 27.2753
+            else:
+                crln0 = self.crln
+                Wsyn = Wsid - self.ww
+
+            transform -= ToSynoptic(crln0, Wsid=Wsid, Wsyn=Wsyn)
 
         return transform
 

@@ -17,3 +17,19 @@ def bilinear(image, x, y):
             image_ += temp
 
     return image_
+
+
+def interpolate(f, x, x_new):
+    idx = np.searchsorted(x, x_new).clip(1, len(x) - 1)
+
+    xa = x[idx - 1]
+    xb = x[idx]
+    dx = xb - xa
+
+    a, b = (xb - x_new) / dx, (x_new - xa) / dx
+
+    fa = np.take_along_axis(f, idx - 1, axis=0)
+    fb = np.take_along_axis(f, idx, axis=0)
+
+    f_new = fa * a + fb * b
+    return f_new
