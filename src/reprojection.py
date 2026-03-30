@@ -3,8 +3,17 @@ from interpolation import bilinear
 from transforms import *
 
 
+WSID = 360 / 25.38
+WSYN = 360 / 27.2753
+AU = 149597870691.
+RSUN = 696000000.
+A, B, C = 14.712, -2.396, -1.787  # differential rotation rates (Snodgrass & Ulrich, ApJ, 351, 309, 1990)
+P_CBS = [-893, 4134, -7347, 6963, -3352, 223]  # convective blue shift coefficients (Stief et al., A&A, 622, A34, 2019)
+
+
 class View:
-    def __init__(self, nx, ny, xc, yc, rsun, crota, crlt, crln, hgln=0, x0=0, y0=0, ww=0.9856):
+    def __init__(self, nx, ny, xc, yc, rsun, crota, crlt, crln, hgln=0,
+                 dsun=AU, vr=0., vw=0., vn=0.):
         '''
         A WCS information container.
 
@@ -30,13 +39,15 @@ class View:
         self.crlt = crlt
         self.crln = crln % 360
         self.hgln = hgln % 360
-        self.x0 = x0
-        self.y0 = y0
-        self.ww = ww
+        self.dsun = dsun
+        self.vr = vr
+        self.vw = vw
+        self.vn = vn
 
     def update(self, increment=False, **kwargs):
         for key, value in kwargs.items():
-            if key in ['nx', 'ny', 'xc', 'yc', 'rsun', 'crota', 'crlt', 'crln', 'hgln', 'x0', 'y0', 'ww']:
+            if key in ['nx', 'ny', 'xc', 'yc', 'rsun', 'crota', 'crlt', 'crln', 'hgln',
+                       'dsun', 'vr', 'vw', 'vn']:
                 if increment:
                     setattr(self, key, getattr(self, key) + value)
                 else:
@@ -56,15 +67,6 @@ class View:
         xc, yc = header['CRPIX2'] - 1, header['CRPIX1'] - 1
         crlt, crln = header['CRLT_OBS'], header['CRLN_OBS']
 
-        if 'PXBEG2' in header:
-            x0 = header['PXBEG2'] - 1
-        else:
-            x0 = 0
-        if 'PXBEG1' in header:
-            y0 = header['PXBEG1'] - 1
-        else:
-            y0 = 0
-
         if 'RADIUS' in header:
             rsun = header['RADIUS']
         elif 'RSUN_ARC' in header:
@@ -82,14 +84,27 @@ class View:
         else:
             hgln = 0
 
-        if 'OBS_VW' in header:
-            vw = header['OBS_VW'] ## Westward velocity
-            d_sun = header['DSUN_OBS'] ## Distance to the Sun
-            ww = vw / d_sun / np.pi * 180 * 24 * 60 * 60  ## Westward rotation rate in degrees per day
+        if 'DSUN_OBS' in header:
+            dsun = header['DSUN_OBS']
         else:
-            ww = 0.9856
+            dsun = AU
 
-        return cls(nx, ny, xc, yc, rsun, crota, crlt, crln, hgln, x0, y0, ww)
+        if 'OBS_VR' in header:
+            vr = header['OBS_VR']
+        else:
+            vr = 0
+
+        if 'OBS_VW' in header:
+            vw = header['OBS_VW']
+        else:
+            vw = 0
+
+        if 'OBS_VN' in header:
+            vn = header['OBS_VN']
+        else:
+            vn = 0
+
+        return cls(nx, ny, xc, yc, rsun, crota, crlt, crln, hgln, dsun, vr, vw, vn)
 
     def to_spherical(self, correct_mu=False, correct_dr=False, stonyhurst=False, mu_thr=0, **kwargs):
         '''
@@ -114,18 +129,47 @@ class View:
                      ToSpherical())
 
         if correct_dr:
-            Wsid = 360 / 25.38
 
             if stonyhurst:
                 crln0 = self.crln - self.hgln
-                Wsyn = 360 / 27.2753
+                Wsyn = WSYN
             else:
                 crln0 = self.crln
-                Wsyn = Wsid - self.ww
+                ww = self.vw / self.dsun / np.pi * 180 * 24 * 60 * 60
+                Wsyn = WSID - ww
 
-            transform -= ToSynoptic(crln0, Wsid=Wsid, Wsyn=Wsyn)
-
+            transform -= ToSynoptic(crln0, Wsid=WSID, Wsyn=Wsyn, A=A, B=B, C=C)
         return transform
+
+    @property
+    def grid(self):
+        return np.mgrid[:self.nx, :self.ny].astype(np.float32)
+
+    def reproject(self, image, view, **kwargs):
+        transform = self.to_spherical(**kwargs) - view.to_spherical(**kwargs)
+        grid, alpha = transform(self.grid)
+        return bilinear(image, *grid) * alpha
+
+    def velocity(self, mu_thr=0, cbs=True, **kwargs):
+        transform = (~Translate((self.xc, self.yc)) -
+                     Scale(self.rsun) +
+                     Expand(thr=mu_thr) -
+                     Rotate.z(self.crota * np.pi / 180))
+
+        grid, _ = transform(self.grid)
+        xi, yi, mu = grid
+
+        grid, _ = Rotate.y(self.crlt * np.pi / 180)(grid)
+
+        W = A + B * grid[0] ** 2 + C * grid[0] ** 4
+        W = W * np.cos(self.crlt * np.pi / 180)
+        W = W * np.pi / 180 / 24 / 3600
+
+        V = self.vr - (xi * self.vn + yi * (self.vw - W * self.dsun)) * RSUN / self.dsun
+
+        if cbs:
+            V += np.polyval(P_CBS, mu)
+        return V
 
 
 def reproject(data, header, header_new=None, **kwargs):
@@ -149,12 +193,7 @@ def reproject(data, header, header_new=None, **kwargs):
 
     view = View.from_header(header)
     view_new = View.from_header(header_).update(**kwargs)
-    transform = view_new.to_spherical(**kwargs) - view.to_spherical(**kwargs)
-
-    grid = np.mgrid[:view_new.nx, :view_new.ny]
-    grid, alpha = transform(grid)
-    data = bilinear(data, *grid) * alpha
-    return data
+    return view_new.reproject(data, view, **kwargs)
 
 
 def remap(data, header, dlon=1, dlat=1, **kwargs):

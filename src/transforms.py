@@ -212,6 +212,16 @@ class Expand(Transform):
             x, y = r
             with np.errstate(invalid='ignore'):
                 z = np.sqrt(1 - x ** 2 - y ** 2)
+
+            if isinstance(z, np.ndarray):
+                t = np.where(z < self.thr)
+                x[t] = np.nan
+                y[t] = np.nan
+                z[t] = np.nan
+            else:
+                if z < self.thr:
+                    x = np.nan
+                    y = np.nan
             return (x, y, z), alpha
         else:
             x, y, z = r
@@ -263,7 +273,7 @@ class ToSynoptic(Transform):
         else:
             return super().__new__(cls)
 
-    def __init__(self, crln, A=14.712, B=-2.396, C=-1.787, Wsid=360 / 25.38, Wsyn=360 / 27.2753, inv=False):
+    def __init__(self, crln, A, B, C, Wsid, Wsyn, inv=False):
         self.crln = crln
         self.A = A
         self.B = B
