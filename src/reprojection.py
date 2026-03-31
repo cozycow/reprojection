@@ -8,8 +8,8 @@ WSYN = 360 / 27.2753
 AU = 149597870691.
 RSUN = 696000000.
 A, B, C = 14.712, -2.396, -1.787  # differential rotation rates (Snodgrass & Ulrich, ApJ, 351, 309, 1990)
-P_CBS = [-893, 4134, -7347, 6963, -3352, 223]  # convective blue shift coefficients (Stief et al., A&A, 622, A34, 2019)
-
+#P_CBS = [-893, 4134, -7347, 6963, -3352, 223]  # convective blue shift coefficients for HMI (Stief et al., A&A, 622, A34, 2019)
+P_CBS = [-768, 2073, -1785, 462] # FDT fit
 
 class View:
     def __init__(self, nx, ny, xc, yc, rsun, crota, crlt, crln, hgln=0,
@@ -150,6 +150,13 @@ class View:
         grid, alpha = transform(self.grid)
         return bilinear(image, *grid) * alpha
 
+    def mu(self, thr=0):
+        transform = (~Translate((self.xc, self.yc)) -
+                     Scale(self.rsun) +
+                     Expand(thr=thr))
+        grid, _ = transform(self.grid)
+        return grid[2]
+
     def velocity(self, mu_thr=0, cbs=True, **kwargs):
         transform = (~Translate((self.xc, self.yc)) -
                      Scale(self.rsun) +
@@ -162,10 +169,19 @@ class View:
         grid, _ = Rotate.y(self.crlt * np.pi / 180)(grid)
 
         W = A + B * grid[0] ** 2 + C * grid[0] ** 4
-        W = W * np.cos(self.crlt * np.pi / 180)
         W = W * np.pi / 180 / 24 / 3600
 
-        V = self.vr - (xi * self.vn + yi * (self.vw - W * self.dsun)) * RSUN / self.dsun
+        ew, _ = Rotate.y(self.crlt * np.pi / 180)((1,0,0))
+
+        Wx = W * ew[0]
+        Wy = W * ew[1]
+        Wz = W * ew[2]
+
+        Vx = -(Wy * mu - Wz * yi) * RSUN + self.vn
+        Vy = -(Wz * xi - Wx * yi) * RSUN + self.vw
+        Vz = (Wx * yi - Wy * xi) * RSUN + self.vr
+
+        V = Vz * (1 - (1 - mu ** 2) * (RSUN / self.dsun) ** 2 / 2) - (xi * Vx + yi * Vy) * RSUN / self.dsun
 
         if cbs:
             V += np.polyval(P_CBS, mu)
