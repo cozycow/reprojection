@@ -12,8 +12,8 @@ A, B, C = 14.712, -2.396, -1.787  # differential rotation rates (Snodgrass & Ulr
 P_CBS = [-768, 2073, -1785, 462] # FDT fit
 
 class View:
-    def __init__(self, nx, ny, xc, yc, rsun, crota, crlt, crln, hgln=0,
-                 dsun=AU, vr=0., vw=0., vn=0.):
+    def __init__(self, nx, ny, xc, yc, rsun, crota, crlt, crln, hgln=0.,
+                 rsun_arc=0., vr=0., vw=0., vn=0., wsyn=0.):
         '''
         A WCS information container.
 
@@ -39,15 +39,16 @@ class View:
         self.crlt = crlt
         self.crln = crln % 360
         self.hgln = hgln % 360
-        self.dsun = dsun
+        self.rsun_arc = rsun_arc
         self.vr = vr
         self.vw = vw
         self.vn = vn
+        self.wsyn = wsyn
 
     def update(self, increment=False, **kwargs):
         for key, value in kwargs.items():
             if key in ['nx', 'ny', 'xc', 'yc', 'rsun', 'crota', 'crlt', 'crln', 'hgln',
-                       'dsun', 'vr', 'vw', 'vn']:
+                       'rsun_arc', 'vr', 'vw', 'vn', 'wsyn']:
                 if increment:
                     setattr(self, key, getattr(self, key) + value)
                 else:
@@ -84,10 +85,10 @@ class View:
         else:
             hgln = 0
 
-        if 'DSUN_OBS' in header:
-            dsun = header['DSUN_OBS']
+        if 'RSUN_ARC' in header:
+            rsun_arc = header['RSUN_ARC']
         else:
-            dsun = AU
+            rsun_arc = 0
 
         if 'OBS_VR' in header:
             vr = header['OBS_VR']
@@ -104,7 +105,27 @@ class View:
         else:
             vn = 0
 
-        return cls(nx, ny, xc, yc, rsun, crota, crlt, crln, hgln, dsun, vr, vw, vn)
+        if 'DSUN_OBS' in header:
+            wsyn = WSID - vw / header['DSUN_OBS'] / np.pi * 180 * 24 * 60 * 60
+        else:
+            wsyn = 0
+
+        return cls(nx, ny, xc, yc, rsun, crota, crlt, crln, hgln, rsun_arc, vr, vw, vn, wsyn)
+
+
+    def helioproj(self, mu_thr=0):
+        transform = (~Translate((self.xc, self.yc)) -
+                     Scale(self.rsun) +
+                     Expand(self.rsun_arc, mu_thr))
+
+        transform_ = (Expand(self.rsun_arc, mu_thr, inv=True) +
+                      Scale(self.rsun) +
+                      Translate((self.xc, self.yc)))
+
+        grid, _ = transform(self.grid)
+        grid, _ = transform_(grid)
+        return grid
+
 
     def to_spherical(self, correct_mu=False, correct_dr=False, stonyhurst=False, mu_thr=0, **kwargs):
         '''
@@ -121,10 +142,10 @@ class View:
                      Expand(thr=mu_thr))
 
         if correct_mu:
-            transform += Filter(lambda r: r[-1])
+            transform += Filter(lambda r: -r[-1])
 
-        transform += (~Rotate.z(self.crota * np.pi / 180) +
-                     Rotate.y(self.crlt * np.pi / 180) -
+        transform += (~Rotate.z(self.crota * np.pi / 180) -
+                     Rotate.y(self.crlt * np.pi / 180) +
                      Rotate.x(self.crln * np.pi / 180) +
                      ToSpherical())
 
@@ -132,13 +153,12 @@ class View:
 
             if stonyhurst:
                 crln0 = self.crln - self.hgln
-                Wsyn = WSYN
+                wsyn = WSYN
             else:
                 crln0 = self.crln
-                ww = self.vw / self.dsun / np.pi * 180 * 24 * 60 * 60
-                Wsyn = WSID - ww
+                wsyn = self.wsyn
 
-            transform -= ToSynoptic(crln0, Wsid=WSID, Wsyn=Wsyn, A=A, B=B, C=C)
+            transform -= ToSynoptic(crln0, Wsid=WSID, Wsyn=wsyn, A=A, B=B, C=C)
         return transform
 
     @property

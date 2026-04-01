@@ -198,7 +198,7 @@ class Rotate(Transform):
             return super().__add__(other)
 
 
-class Expand(Transform):
+class Expand_(Transform):
 
     def __init__(self, inv=False, thr=0):
         self.inv = inv
@@ -239,6 +239,48 @@ class Expand(Transform):
         return type(self)(not self.inv, self.thr)
 
 
+class Expand(Transform):
+
+    def __init__(self, rsun_arc=0, thr=0, inv=False):
+        self.rsun_arc = rsun_arc
+        self.thr = thr
+        self.inv = inv
+
+    def __repr__(self):
+        return f'Expand(thr:{self.thr}, inv:{self.inv})'
+
+    def __call__(self, r, alpha=1):
+        if not self.inv:
+            x, y = r
+
+            v = np.sqrt(x ** 2 + y ** 2)
+            mu = np.sqrt((1 - v ** 2).clip(0))
+            q = np.tan(self.rsun_arc * np.pi / 180 / 3600)
+
+            u = v * np.sqrt(1 - q ** 2) / (1 + q * mu)
+            x, y = x / v * u, y / v * u
+            z = -np.sqrt((1 - x ** 2 - y ** 2).clip(0))
+
+            t = np.where(z >= -self.thr)
+            x[t], y[t], z[t] = np.nan, np.nan, np.nan
+            return (x, y, z), alpha
+        else:
+            x, y, z = r
+
+            u = np.sqrt(x ** 2 + y ** 2)
+            q = np.tan(self.rsun_arc * np.pi / 180 / 3600)
+
+            v = u * np.sqrt(1 - q ** 2) / (1 + q * z)
+            x, y = x / u * v, y / u * v
+
+            t = np.where(z >= -self.thr)
+            x[t], y[t] = np.nan, np.nan
+            return (x, y), alpha
+
+    def __invert__(self):
+        return type(self)(self.rsun_arc, self.thr, not self.inv)
+
+
 class ToSpherical(Transform):
 
     def __init__(self, inv=False):
@@ -248,14 +290,14 @@ class ToSpherical(Transform):
         if not self.inv:
             x, y, z = r
             theta = np.arcsin(x) * 180 / np.pi
-            phi = np.arctan2(y, z) * 180 / np.pi
+            phi = np.arctan2(y, -z) * 180 / np.pi
             phi = phi % 360
             return (theta, phi), alpha
         else:
             theta, phi = r
             x = np.sin(theta * np.pi / 180)
             y, z = (np.cos(theta * np.pi / 180) * np.sin(phi * np.pi / 180),
-                    np.cos(theta * np.pi / 180) * np.cos(phi * np.pi / 180))
+                    -np.cos(theta * np.pi / 180) * np.cos(phi * np.pi / 180))
             return (x, y, z), alpha
 
     def __repr__(self):
