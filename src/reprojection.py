@@ -150,7 +150,6 @@ class View:
                      ToSpherical())
 
         if correct_dr:
-
             if stonyhurst:
                 crln0 = self.crln - self.hgln
                 wsyn = WSYN
@@ -175,7 +174,7 @@ class View:
                      Scale(self.rsun) +
                      Expand(thr=thr))
         grid, _ = transform(self.grid)
-        return grid[2]
+        return -grid[2]
 
     def velocity(self, mu_thr=0, cbs=True, **kwargs):
         transform = (~Translate((self.xc, self.yc)) -
@@ -184,27 +183,30 @@ class View:
                      Rotate.z(self.crota * np.pi / 180))
 
         grid, _ = transform(self.grid)
-        xi, yi, mu = grid
+        xi, yi, zi = grid
 
-        grid, _ = Rotate.y(self.crlt * np.pi / 180)(grid)
+        grid, _ = Rotate.y(-self.crlt * np.pi / 180)(grid)
 
         W = A + B * grid[0] ** 2 + C * grid[0] ** 4
         W = W * np.pi / 180 / 24 / 3600
 
-        ew, _ = Rotate.y(self.crlt * np.pi / 180)((1,0,0))
+        ew, _ = Rotate.y(-self.crlt * np.pi / 180)((1,0,0))
 
         Wx = W * ew[0]
         Wy = W * ew[1]
         Wz = W * ew[2]
 
-        Vx = (Wy * mu - Wz * yi) * RSUN - self.vn
-        Vy = (Wz * xi - Wx * mu) * RSUN - self.vw
+        Vx = (Wy * zi - Wz * yi) * RSUN + self.vn
+        Vy = (Wz * xi - Wx * zi) * RSUN + self.vw
         Vz = (Wx * yi - Wy * xi) * RSUN + self.vr
 
-        V = Vz * (1 - (1 - mu ** 2) * (RSUN / self.dsun) ** 2 / 2) + (xi * Vx + yi * Vy) * RSUN / self.dsun
+        q = np.tan(self.rsun_arc * np.pi / 180 / 3600)
+        d = np.sqrt(xi ** 2 + yi ** 2 + (zi - 1 / q) ** 2)
+
+        V = -(xi * Vx + yi * Vy + (zi - 1 / q) * Vz) / d
 
         if cbs:
-            V += np.polyval(P_CBS, mu)
+            V += np.polyval(P_CBS, -zi)
         return V
 
 
