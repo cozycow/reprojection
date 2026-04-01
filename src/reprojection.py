@@ -177,11 +177,11 @@ class View:
         Wy = W * ew[1]
         Wz = W * ew[2]
 
-        Vx = -(Wy * mu - Wz * yi) * RSUN + self.vn
-        Vy = -(Wz * xi - Wx * yi) * RSUN + self.vw
+        Vx = (Wy * mu - Wz * yi) * RSUN - self.vn
+        Vy = (Wz * xi - Wx * mu) * RSUN - self.vw
         Vz = (Wx * yi - Wy * xi) * RSUN + self.vr
 
-        V = Vz * (1 - (1 - mu ** 2) * (RSUN / self.dsun) ** 2 / 2) - (xi * Vx + yi * Vy) * RSUN / self.dsun
+        V = Vz * (1 - (1 - mu ** 2) * (RSUN / self.dsun) ** 2 / 2) + (xi * Vx + yi * Vy) * RSUN / self.dsun
 
         if cbs:
             V += np.polyval(P_CBS, mu)
