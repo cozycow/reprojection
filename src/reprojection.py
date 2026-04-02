@@ -121,22 +121,6 @@ class View:
         return cls(nx, ny, xc, yc, rsun, crota, crlt, crln, hgln, tdel, rsun_arc, vr, vw, vn, wsyn)
 
 
-    def helioproj(self, mu_thr=0):
-        transform = (~Translate((self.xc, self.yc)) -
-                     Scale(self.rsun) +
-                     Expand(mu_thr) +
-                     ToParaxial(theta=self.rsun_arc / 3600))
-
-        transform_ = (~ToParaxial(theta=self.rsun_arc / 3600) -
-                      Expand(mu_thr) +
-                      Scale(self.rsun) +
-                      Translate((self.xc, self.yc)))
-
-        grid, _ = transform(self.grid)
-        grid, _ = transform_(grid)
-        return grid
-
-
     def to_spherical(self, correct_mu=False, correct_dr=False, stonyhurst=False, mu_thr=0, **kwargs):
         '''
         Constructs a transformation from image coordinates (in pixels) to Carrington coordinates (in degrees).
@@ -147,7 +131,7 @@ class View:
         :return:
         '''
 
-        crln = self.crln - self.tdel * WSID / 24 / 3600
+        crln = self.crln + self.tdel * WSID / 24 / 3600
 
         transform = (~Translate((self.xc, self.yc)) -
                      Scale(self.rsun) +
