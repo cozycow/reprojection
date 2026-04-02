@@ -209,22 +209,22 @@ class Expand(Transform):
 
     def __call__(self, r, alpha=1):
         if not self.inv:
-            x, y = r
-            z = -np.sqrt((1 - x ** 2 - y ** 2).clip(0))
+            y, x = r
+            z = np.sqrt((1 - x ** 2 - y ** 2).clip(0))
             if isinstance(z, np.ndarray):
-                t = np.where(z >= -self.thr)
+                t = np.where(z <= self.thr)
                 x[t], y[t], z[t] = np.nan, np.nan, np.nan
             else:
-                if z >= -self.thr:
+                if z <= self.thr:
                     x, y = np.nan, np.nan
             return (x, y, z), alpha
         else:
-            x, y, z = r
+            y, x, z = r
             if isinstance(z, np.ndarray):
-                t = np.where(z >= -self.thr)
+                t = np.where(z <= self.thr)
                 x[t], y[t] = np.nan, np.nan
             else:
-                if z < self.thr:
+                if z <= self.thr:
                     x, y = np.nan, np.nan
             return (x, y), alpha
 
@@ -242,12 +242,12 @@ class ToParaxial(Transform):
 
     def __call__(self, r, alpha=1):
         x, y, z = r
-        t = np.where(z >= 0)
+        t = np.where(z <= 0)
 
         q = np.tan(self.theta * np.pi / 180)
-        q = np.sqrt(1 - q ** 2) / (1 - q * z)
+        q = np.sqrt(1 - q ** 2) / (1 + q * z)
         x, y = x * q, y * q
-        z = -np.sqrt((1 - x ** 2 - y ** 2).clip(0))
+        z = np.sqrt((1 - x ** 2 - y ** 2).clip(0))
 
         x[t], y[t], z[t] = np.nan, np.nan, np.nan
         return (x, y, z), alpha
@@ -264,15 +264,15 @@ class ToSpherical(Transform):
     def __call__(self, r, alpha=1):
         if not self.inv:
             x, y, z = r
-            theta = np.arcsin(x) * 180 / np.pi
-            phi = np.arctan2(y, -z) * 180 / np.pi
+            theta = np.arcsin(y) * 180 / np.pi
+            phi = np.arctan2(x, z) * 180 / np.pi
             phi = phi % 360
             return (theta, phi), alpha
         else:
             theta, phi = r
-            x = np.sin(theta * np.pi / 180)
-            y, z = (np.cos(theta * np.pi / 180) * np.sin(phi * np.pi / 180),
-                    -np.cos(theta * np.pi / 180) * np.cos(phi * np.pi / 180))
+            y = np.sin(theta * np.pi / 180)
+            x, z = (np.cos(theta * np.pi / 180) * np.sin(phi * np.pi / 180),
+                    np.cos(theta * np.pi / 180) * np.cos(phi * np.pi / 180))
             return (x, y, z), alpha
 
     def __repr__(self):
