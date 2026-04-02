@@ -147,24 +147,27 @@ class View:
         :return:
         '''
 
+        crln = self.crln - self.tdel * WSID / 24 / 3600
+
         transform = (~Translate((self.xc, self.yc)) -
                      Scale(self.rsun) +
-                     Expand(thr=mu_thr) + ToParaxial(theta=self.rsun_arc / 3600))
+                     Expand(thr=mu_thr) +
+                     ToParaxial(theta=self.rsun_arc / 3600))
 
         if correct_mu:
             transform += Filter(lambda r: -r[-1])
 
         transform += (~Rotate.z(self.crota * np.pi / 180) -
                      Rotate.y(self.crlt * np.pi / 180) +
-                     Rotate.x((self.crln - self.tdel * WSID / 24 / 3600) * np.pi / 180) +
+                     Rotate.x(crln * np.pi / 180) +
                      ToSpherical())
 
         if correct_dr:
             if stonyhurst:
-                crln0 = self.crln - self.hgln
+                crln0 = crln - self.hgln
                 wsyn = WSYN
             else:
-                crln0 = self.crln
+                crln0 = crln
                 wsyn = self.wsyn
 
             transform -= ToSynoptic(crln0, Wsid=WSID, Wsyn=wsyn, A=A, B=B, C=C)
@@ -189,7 +192,8 @@ class View:
     def velocity(self, mu_thr=0, cbs=True, **kwargs):
         transform = (~Translate((self.xc, self.yc)) -
                      Scale(self.rsun) +
-                     Expand(thr=mu_thr) -
+                     Expand(thr=mu_thr) +
+                     ToParaxial(theta=self.rsun_arc / 3600) -
                      Rotate.z(self.crota * np.pi / 180))
 
         grid, _ = transform(self.grid)
@@ -206,14 +210,14 @@ class View:
         Wy = W * ew[1]
         Wz = W * ew[2]
 
-        Vx = (Wy * zi - Wz * yi) * RSUN + self.vn
-        Vy = (Wz * xi - Wx * zi) * RSUN + self.vw
+        Vx = (Wy * zi - Wz * yi) * RSUN - self.vn
+        Vy = (Wz * xi - Wx * zi) * RSUN - self.vw
         Vz = (Wx * yi - Wy * xi) * RSUN + self.vr
 
         q = np.tan(self.rsun_arc * np.pi / 180 / 3600)
-        d = np.sqrt(xi ** 2 + yi ** 2 + (zi - 1 / q) ** 2)
+        d = np.sqrt(xi ** 2 + yi ** 2 + (zi + 1 / q) ** 2)
 
-        V = -(xi * Vx + yi * Vy + (zi - 1 / q) * Vz) / d
+        V = (xi * Vx + yi * Vy + (zi + 1 / q) * Vz) / d
 
         if cbs:
             V += np.polyval(P_CBS, -zi)
