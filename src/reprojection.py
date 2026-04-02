@@ -12,7 +12,7 @@ A, B, C = 14.712, -2.396, -1.787  # differential rotation rates (Snodgrass & Ulr
 P_CBS = [-768, 2073, -1785, 462] # FDT fit
 
 class View:
-    def __init__(self, nx, ny, xc, yc, rsun, crota, crlt, crln, hgln=0.,
+    def __init__(self, nx, ny, xc, yc, rsun, crota, crlt, crln, hgln=0., tdel=0.,
                  rsun_arc=0., vr=0., vw=0., vn=0., wsyn=0.):
         '''
         A WCS information container.
@@ -39,6 +39,7 @@ class View:
         self.crlt = crlt
         self.crln = crln % 360
         self.hgln = hgln % 360
+        self.tdel = tdel
         self.rsun_arc = rsun_arc
         self.vr = vr
         self.vw = vw
@@ -47,7 +48,7 @@ class View:
 
     def update(self, increment=False, **kwargs):
         for key, value in kwargs.items():
-            if key in ['nx', 'ny', 'xc', 'yc', 'rsun', 'crota', 'crlt', 'crln', 'hgln',
+            if key in ['nx', 'ny', 'xc', 'yc', 'rsun', 'crota', 'crlt', 'crln', 'hgln', 'tdel',
                        'rsun_arc', 'vr', 'vw', 'vn', 'wsyn']:
                 if increment:
                     setattr(self, key, getattr(self, key) + value)
@@ -83,42 +84,51 @@ class View:
         if 'HGLN_OBS' in header:
             hgln = header['HGLN_OBS']
         else:
-            hgln = 0
+            hgln = 0.
+
+        if 'EAR_TDEL' in header:
+            tdel = header['EAR_TDEL']
+        else:
+            tdel = 0.
 
         if 'RSUN_ARC' in header:
             rsun_arc = header['RSUN_ARC']
+        elif 'RSUN_OBS' in header:
+            rsun_arc = header['RSUN_OBS']
         else:
-            rsun_arc = 0
+            rsun_arc = 0.
 
         if 'OBS_VR' in header:
             vr = header['OBS_VR']
         else:
-            vr = 0
+            vr = 0.
 
         if 'OBS_VW' in header:
             vw = header['OBS_VW']
         else:
-            vw = 0
+            vw = 0.
 
         if 'OBS_VN' in header:
             vn = header['OBS_VN']
         else:
-            vn = 0
+            vn = 0.
 
         if 'DSUN_OBS' in header:
             wsyn = WSID - vw / header['DSUN_OBS'] / np.pi * 180 * 24 * 60 * 60
         else:
-            wsyn = 0
+            wsyn = 0.
 
-        return cls(nx, ny, xc, yc, rsun, crota, crlt, crln, hgln, rsun_arc, vr, vw, vn, wsyn)
+        return cls(nx, ny, xc, yc, rsun, crota, crlt, crln, hgln, tdel, rsun_arc, vr, vw, vn, wsyn)
 
 
     def helioproj(self, mu_thr=0):
         transform = (~Translate((self.xc, self.yc)) -
                      Scale(self.rsun) +
-                     Expand(self.rsun_arc, mu_thr))
+                     Expand(mu_thr) +
+                     ToParaxial(theta=self.rsun_arc / 3600))
 
-        transform_ = (Expand(self.rsun_arc, mu_thr, inv=True) +
+        transform_ = (~ToParaxial(theta=self.rsun_arc / 3600) -
+                      Expand(mu_thr) +
                       Scale(self.rsun) +
                       Translate((self.xc, self.yc)))
 
@@ -139,14 +149,14 @@ class View:
 
         transform = (~Translate((self.xc, self.yc)) -
                      Scale(self.rsun) +
-                     Expand(thr=mu_thr))
+                     Expand(thr=mu_thr) + ToParaxial(theta=self.rsun_arc / 3600))
 
         if correct_mu:
             transform += Filter(lambda r: -r[-1])
 
         transform += (~Rotate.z(self.crota * np.pi / 180) -
                      Rotate.y(self.crlt * np.pi / 180) +
-                     Rotate.x(self.crln * np.pi / 180) +
+                     Rotate.x((self.crln - self.tdel * WSID / 24 / 3600) * np.pi / 180) +
                      ToSpherical())
 
         if correct_dr:

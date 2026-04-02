@@ -198,51 +198,9 @@ class Rotate(Transform):
             return super().__add__(other)
 
 
-class Expand_(Transform):
-
-    def __init__(self, inv=False, thr=0):
-        self.inv = inv
-        self.thr = thr
-
-    def __repr__(self):
-        return f'Expand(inv:{self.inv}, thr:{self.thr})'
-
-    def __call__(self, r, alpha=1):
-        if not self.inv:
-            x, y = r
-            with np.errstate(invalid='ignore'):
-                z = np.sqrt(1 - x ** 2 - y ** 2)
-
-            if isinstance(z, np.ndarray):
-                t = np.where(z < self.thr)
-                x[t] = np.nan
-                y[t] = np.nan
-                z[t] = np.nan
-            else:
-                if z < self.thr:
-                    x = np.nan
-                    y = np.nan
-            return (x, y, z), alpha
-        else:
-            x, y, z = r
-            if isinstance(z, np.ndarray):
-                t = np.where(z < self.thr)
-                x[t] = np.nan
-                y[t] = np.nan
-            else:
-                if z < self.thr:
-                    x = np.nan
-                    y = np.nan
-            return (x, y), alpha
-
-    def __invert__(self):
-        return type(self)(not self.inv, self.thr)
-
-
 class Expand(Transform):
 
-    def __init__(self, rsun_arc=0, thr=0, inv=False):
-        self.rsun_arc = rsun_arc
+    def __init__(self, thr=0, inv=False):
         self.thr = thr
         self.inv = inv
 
@@ -252,33 +210,50 @@ class Expand(Transform):
     def __call__(self, r, alpha=1):
         if not self.inv:
             x, y = r
-
-            v = np.sqrt(x ** 2 + y ** 2)
-            mu = np.sqrt((1 - v ** 2).clip(0))
-            q = np.tan(self.rsun_arc * np.pi / 180 / 3600)
-
-            u = v * np.sqrt(1 - q ** 2) / (1 + q * mu)
-            x, y = x / v * u, y / v * u
             z = -np.sqrt((1 - x ** 2 - y ** 2).clip(0))
-
-            t = np.where(z >= -self.thr)
-            x[t], y[t], z[t] = np.nan, np.nan, np.nan
+            if isinstance(z, np.ndarray):
+                t = np.where(z >= -self.thr)
+                x[t], y[t], z[t] = np.nan, np.nan, np.nan
+            else:
+                if z >= -self.thr:
+                    x, y = np.nan, np.nan
             return (x, y, z), alpha
         else:
             x, y, z = r
-
-            u = np.sqrt(x ** 2 + y ** 2)
-            q = np.tan(self.rsun_arc * np.pi / 180 / 3600)
-
-            v = u * np.sqrt(1 - q ** 2) / (1 + q * z)
-            x, y = x / u * v, y / u * v
-
-            t = np.where(z >= -self.thr)
-            x[t], y[t] = np.nan, np.nan
+            if isinstance(z, np.ndarray):
+                t = np.where(z >= -self.thr)
+                x[t], y[t] = np.nan, np.nan
+            else:
+                if z < self.thr:
+                    x, y = np.nan, np.nan
             return (x, y), alpha
 
     def __invert__(self):
-        return type(self)(self.rsun_arc, self.thr, not self.inv)
+        return type(self)(self.thr, not self.inv)
+
+
+class ToParaxial(Transform):
+
+    def __init__(self, theta=0):
+        self.theta = theta
+
+    def __repr__(self):
+        return f'ToParaxial(theta:{self.theta})'
+
+    def __call__(self, r, alpha=1):
+        x, y, z = r
+        t = np.where(z >= 0)
+
+        q = np.tan(self.theta * np.pi / 180)
+        q = np.sqrt(1 - q ** 2) / (1 - q * z)
+        x, y = x * q, y * q
+        z = -np.sqrt((1 - x ** 2 - y ** 2).clip(0))
+
+        x[t], y[t], z[t] = np.nan, np.nan, np.nan
+        return (x, y, z), alpha
+
+    def __invert__(self):
+        return type(self)(-self.theta)
 
 
 class ToSpherical(Transform):
