@@ -121,7 +121,34 @@ class View:
         return cls(nx, ny, xc, yc, rsun, crota, crlt, crln, hgln, tdel, rsun_arc, vr, vw, vn, wsyn)
 
 
-    def to_spherical(self, correct_mu=False, correct_dr=False, stonyhurst=False, mu_thr=0, **kwargs):
+    def to_helioprojective(self, correct_mu=False, correct_paraxial=False, mu_thr=0, **kwargs):
+        transform = (~Translate((self.xc, self.yc)) -
+                     Scale(self.rsun) +
+                     Expand())
+
+        if correct_mu:
+            transform += Filter(lambda r: r[-1])
+
+        transform += Filter(lambda r: np.where(r[-1] > mu_thr, 1, np.nan))
+
+        if correct_paraxial:
+            transform += ToParaxial(theta=self.rsun_arc / 3600)
+
+        transform += Rotate.z(self.crota * np.pi / 180)
+        return transform
+
+
+    def to_carrington(self, **kwargs):
+        crln = self.crln + self.tdel * WSID / 24 / 3600
+
+        transform = self.to_helioprojective(**kwargs)
+        transform += (~Rotate.x(self.crlt * np.pi / 180) +
+                      Rotate.y(crln * np.pi / 180) +
+                      ToSpherical())
+        return transform
+
+
+    def to_synoptic(self, stonyhurst=False, **kwargs):
         '''
         Constructs a transformation from image coordinates (in pixels) to Carrington coordinates (in degrees).
 
@@ -132,29 +159,16 @@ class View:
         '''
 
         crln = self.crln + self.tdel * WSID / 24 / 3600
+        transform = self.to_carrington(**kwargs)
 
-        transform = (~Translate((self.xc, self.yc)) -
-                     Scale(self.rsun) +
-                     Expand(thr=mu_thr) +
-                     ToParaxial(theta=self.rsun_arc / 3600))
+        if stonyhurst:
+            crln0 = crln - self.hgln
+            wsyn = WSYN
+        else:
+            crln0 = crln
+            wsyn = self.wsyn
 
-        if correct_mu:
-            transform += Filter(lambda r: r[-1])
-
-        transform += (Rotate.z(self.crota * np.pi / 180) -
-                     Rotate.x(self.crlt * np.pi / 180) +
-                     Rotate.y(crln * np.pi / 180) +
-                     ToSpherical())
-
-        if correct_dr:
-            if stonyhurst:
-                crln0 = crln - self.hgln
-                wsyn = WSYN
-            else:
-                crln0 = crln
-                wsyn = self.wsyn
-
-            transform -= ToSynoptic(crln0, Wsid=WSID, Wsyn=wsyn, A=A, B=B, C=C)
+        transform += ToSynoptic(crln0, Wsid=WSID, Wsyn=wsyn, A=A, B=B, C=C)
         return transform
 
     @property
@@ -162,23 +176,21 @@ class View:
         return np.mgrid[:self.nx, :self.ny].astype(np.float32)
 
     def reproject(self, image, view, **kwargs):
-        transform = self.to_spherical(**kwargs) - view.to_spherical(**kwargs)
+        transform = self.to_synoptic(**kwargs) - view.to_synoptic(**kwargs)
         grid, alpha = transform(self.grid)
         return bilinear(image, *grid) * alpha
 
-    def mu(self, thr=0):
-        transform = (~Translate((self.xc, self.yc)) -
-                     Scale(self.rsun) +
-                     Expand(thr=thr))
-        grid, _ = transform(self.grid)
-        return grid[2]
+    def mu(self, *args, **kwargs):
+        transform = self.to_helioprojective(correct_mu=False, correct_paraxial=False, **kwargs)
+        if len(args) > 0:
+            r, alpha = transform(args)
+        else:
+            r, alpha = transform(self.grid)
+        q = np.tan(self.rsun_arc / 3600 * np.pi / 180)
+        return r[2] * np.sqrt((1 - q ** 2) / (1 - q ** 2 * r[2] **2)) * alpha
 
-    def velocity(self, mu_thr=0, cbs=True, **kwargs):
-        transform = (~Translate((self.xc, self.yc)) -
-                     Scale(self.rsun) +
-                     Expand(thr=mu_thr) +
-                     ToParaxial(theta=self.rsun_arc / 3600) +
-                     Rotate.z(self.crota * np.pi / 180))
+    def velocity(self, cbs=True, **kwargs):
+        transform = self.to_helioprojective(**kwargs)
 
         grid, _ = transform(self.grid)
         xi, yi, zi = grid
@@ -247,7 +259,7 @@ def remap(data, header, dlon=1, dlat=1, **kwargs):
     '''
 
     view = View.from_header(header).update(**kwargs)
-    transform = ~view.to_spherical(**kwargs)
+    transform = ~view.to_synoptic(**kwargs)
 
     grid = np.mgrid[-90:90 + dlat / 2:dlat, -180:180:dlon]
     grid, alpha = transform(grid)

@@ -200,36 +200,29 @@ class Rotate(Transform):
 
 class Expand(Transform):
 
-    def __init__(self, thr=0, inv=False):
-        self.thr = thr
+    def __init__(self, inv=False):
         self.inv = inv
 
     def __repr__(self):
-        return f'Expand(thr:{self.thr}, inv:{self.inv})'
+        return f'Expand(inv:{self.inv})'
 
     def __call__(self, r, alpha=1):
         if not self.inv:
             y, x = r
-            z = np.sqrt((1 - x ** 2 - y ** 2).clip(0))
-            if isinstance(z, np.ndarray):
-                t = np.where(z <= self.thr)
-                x[t], y[t], z[t] = np.nan, np.nan, np.nan
+            z2 = 1 - x ** 2 - y ** 2
+            if isinstance(z2, np.ndarray):
+                t = np.where(z2 < 0)
+                x[t], y[t], z2[t] = np.nan, np.nan, np.nan
             else:
-                if z <= self.thr:
+                if z2 < 0:
                     x, y = np.nan, np.nan
-            return (x, y, z), alpha
+            return (x, y, np.sqrt(z2)), alpha
         else:
             y, x, z = r
-            if isinstance(z, np.ndarray):
-                t = np.where(z <= self.thr)
-                x[t], y[t] = np.nan, np.nan
-            else:
-                if z <= self.thr:
-                    x, y = np.nan, np.nan
             return (x, y), alpha
 
     def __invert__(self):
-        return type(self)(self.thr, not self.inv)
+        return type(self)(not self.inv)
 
 
 class ToParaxial(Transform):
@@ -242,7 +235,7 @@ class ToParaxial(Transform):
 
     def __call__(self, r, alpha=1):
         x, y, z = r
-        t = np.where(z <= 0)
+        t = np.where(z < 0)
 
         q = np.tan(self.theta * np.pi / 180)
         q = np.sqrt(1 - q ** 2) / (1 + q * z)
@@ -310,7 +303,7 @@ class ToSynoptic(Transform):
         Wobs = self.Wsid - self.Wsyn
 
         q = 1 - (W - self.Wsid) / (W - Wobs)
-        if not self.inv:
+        if self.inv:
             q = 1 / q
 
         dphi = (phi - self.crln - 180) % 360 - 180
