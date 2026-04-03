@@ -120,21 +120,21 @@ class View:
 
         return cls(nx, ny, xc, yc, rsun, crota, crlt, crln, hgln, tdel, rsun_arc, vr, vw, vn, wsyn)
 
+    def to_helioprojective(self, correct_mu=False, mu_thr=0, **kwargs):
+        def mu(r):
+            q = np.tan(self.rsun_arc / 3600 * np.pi / 180)
+            return (r[2] - q) / np.sqrt(q ** 2 - 2 * r[2] * q + 1)
 
-    def to_helioprojective(self, correct_mu=False, correct_paraxial=False, mu_thr=0, **kwargs):
         transform = (~Translate((self.xc, self.yc)) -
                      Scale(self.rsun) +
-                     Expand())
+                     Expand() +
+                     ToParaxial(theta=self.rsun_arc / 3600))
 
         if correct_mu:
-            transform += Filter(lambda r: r[-1])
+            transform += Filter(mu)
 
-        transform += Filter(lambda r: np.where(r[-1] > mu_thr, 1, np.nan))
-
-        if correct_paraxial:
-            transform += ToParaxial(theta=self.rsun_arc / 3600)
-
-        transform += Rotate.z(self.crota * np.pi / 180)
+        transform += (Filter(lambda r: np.where(mu(r) > mu_thr, 1, np.nan)) +
+                      Rotate.z(self.crota * np.pi / 180))
         return transform
 
 
@@ -181,42 +181,36 @@ class View:
         return bilinear(image, *grid) * alpha
 
     def mu(self, *args, **kwargs):
-        transform = self.to_helioprojective(correct_mu=False, correct_paraxial=False, **kwargs)
+        transform = self.to_helioprojective(correct_mu=False, **kwargs)
         if len(args) > 0:
             r, alpha = transform(args)
         else:
             r, alpha = transform(self.grid)
         q = np.tan(self.rsun_arc / 3600 * np.pi / 180)
-        return r[2] * np.sqrt((1 - q ** 2) / (1 - q ** 2 * r[2] **2)) * alpha
+        return (r[2] - q) / np.sqrt(q ** 2 - 2 * r[2] * q + 1) * alpha
 
-    def velocity(self, cbs=True, **kwargs):
+    def velocity(self, cbs=False, **kwargs):
         transform = self.to_helioprojective(**kwargs)
 
         grid, _ = transform(self.grid)
         xi, yi, zi = grid
-
         grid, _ = Rotate.x(-self.crlt * np.pi / 180)(grid)
 
         W = A + B * grid[1] ** 2 + C * grid[1] ** 4
-        W = W * np.pi / 180 / 24 / 3600
-
+        U = RSUN * W * np.pi / 180 / 24 / 3600
         ew, _ = Rotate.x(self.crlt * np.pi / 180)((0,1,0))
 
-        Wx = W * ew[0]
-        Wy = W * ew[1]
-        Wz = W * ew[2]
-
-        Vx = (Wy * zi - Wz * yi) * RSUN - self.vw
-        Vy = (Wz * xi - Wx * zi) * RSUN - self.vn
-        Vz = (Wx * yi - Wy * xi) * RSUN - self.vr
+        Vx = (ew[1] * zi - ew[2] * yi) * U - self.vw
+        Vy = ew[2] * xi * U - self.vn
+        Vz = -ew[1] * xi * U - self.vr
 
         q = np.tan(self.rsun_arc * np.pi / 180 / 3600)
-        d = np.sqrt(xi ** 2 + yi ** 2 + (zi - 1 / q) ** 2)
-
-        V = (xi * Vx + yi * Vy + (zi - 1 / q) * Vz) / d
+        d = np.sqrt(q ** 2 - 2 * zi * q + 1)
+        V = (q * (xi * Vx + yi * Vy) + (q * zi - 1) * Vz) / d
 
         if cbs:
-            V += np.polyval(P_CBS, zi)
+            mu = (zi - q) / d
+            V += np.polyval(P_CBS, mu)
         return V
 
 
