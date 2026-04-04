@@ -208,7 +208,7 @@ class Expand(Transform):
 
     def __call__(self, r, alpha=1):
         if not self.inv:
-            y, x = r
+            x, y = r
             z2 = 1 - x ** 2 - y ** 2
             if isinstance(z2, np.ndarray):
                 t = np.where(z2 < 0)
@@ -216,10 +216,18 @@ class Expand(Transform):
             else:
                 if z2 < 0:
                     x, y = np.nan, np.nan
-            return (x, y, np.sqrt(z2)), alpha
+            return (y, x, np.sqrt(z2)), alpha
         else:
-            y, x, z = r
-            return (x, y), alpha
+            x, y, z = r
+
+            if isinstance(z, np.ndarray):
+                t = np.where(z < 0)
+                x[t], y[t] = np.nan, np.nan
+            else:
+                if z < 0:
+                    x, y = np.nan, np.nan
+
+            return (y, x), alpha
 
     def __invert__(self):
         return type(self)(not self.inv)
@@ -235,14 +243,12 @@ class ToParaxial(Transform):
 
     def __call__(self, r, alpha=1):
         x, y, z = r
-        t = np.where(z < 0)
 
         q = np.tan(self.theta * np.pi / 180)
-        q = np.sqrt(1 - q ** 2) / (1 + q * z)
-        x, y = x * q, y * q
-        z = np.sqrt((1 - x ** 2 - y ** 2).clip(0))
+        u = np.sqrt(1 - q ** 2) / (1 + q * z)
+        x, y = x * u, y * u
+        z = (z + q) / (1 + q * z)
 
-        x[t], y[t], z[t] = np.nan, np.nan, np.nan
         return (x, y, z), alpha
 
     def __invert__(self):

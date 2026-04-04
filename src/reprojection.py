@@ -123,7 +123,7 @@ class View:
     def to_helioprojective(self, correct_mu=False, mu_thr=0, **kwargs):
         def mu(r):
             q = np.tan(self.rsun_arc / 3600 * np.pi / 180)
-            return (r[2] - q) / np.sqrt(q ** 2 - 2 * r[2] * q + 1)
+            return (r[2] - q) / np.sqrt(1 - 2 * r[2] * q + q ** 2)
 
         transform = (~Translate((self.xc, self.yc)) -
                      Scale(self.rsun) +
@@ -176,7 +176,7 @@ class View:
         return np.mgrid[:self.nx, :self.ny].astype(np.float32)
 
     def reproject(self, image, view, **kwargs):
-        transform = self.to_synoptic(**kwargs) - view.to_synoptic(**kwargs)
+        transform = self.to_carrington(**kwargs) - view.to_carrington(**kwargs)
         grid, alpha = transform(self.grid)
         return bilinear(image, *grid) * alpha
 
@@ -187,7 +187,7 @@ class View:
         else:
             r, alpha = transform(self.grid)
         q = np.tan(self.rsun_arc / 3600 * np.pi / 180)
-        return (r[2] - q) / np.sqrt(q ** 2 - 2 * r[2] * q + 1) * alpha
+        return (r[2] - q) / np.sqrt(1 - 2 * r[2] * q + q ** 2) * alpha
 
     def velocity(self, cbs=False, **kwargs):
         transform = self.to_helioprojective(**kwargs)
@@ -253,7 +253,7 @@ def remap(data, header, dlon=1, dlat=1, **kwargs):
     '''
 
     view = View.from_header(header).update(**kwargs)
-    transform = ~view.to_synoptic(**kwargs)
+    transform = ~view.to_carrington(**kwargs)
 
     grid = np.mgrid[-90:90 + dlat / 2:dlat, -180:180:dlon]
     grid, alpha = transform(grid)
