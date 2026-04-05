@@ -129,18 +129,11 @@ class View:
 
         return cls(nx, ny, xc, yc, rsun, crota, crlt, crln, hgln, tdel, rsun_arc, vr, vw, vn, wsyn)
 
-    def get_reference(self, name='image', **kwargs):
-        if name == 'image':
-            return Pipe()
-        elif name == 'helioprojective':
-            return self.to_helioprojective(**kwargs)
-        elif name == 'carrington':
-            return self.to_carrington(**kwargs)
-        elif name == 'synoptic':
-            return self.to_synoptic(**kwargs)
+    def get_transform(self, name='image', **kwargs):
+        return getattr(self, 'to_' + name, Pipe)(**kwargs)
 
-    def to_helioprojective(self, correct_mu=False, mu_thr=0, reference='image', **kwargs):
-        transform = (~self.get_reference(reference, **kwargs) -
+    def to_helioprojective(self, correct_mu=False, mu_thr=0, origin='image', **kwargs):
+        transform = (~self.get_transform(origin, **kwargs) -
                      Translate((self.xc, self.yc)) -
                      Scale(self.rsun) +
                      Expand() +
@@ -153,16 +146,16 @@ class View:
                       Rotate.z(self.crota * np.pi / 180))
         return transform
 
-    def to_carrington(self, reference='image', **kwargs):
+    def to_carrington(self, origin='image', **kwargs):
         crln = self.crln + self.tdel * WSID / 24 / 3600
 
-        transform = (~self.get_reference(reference, **kwargs) +
+        transform = (~self.get_transform(origin, **kwargs) +
                      self.to_helioprojective(**kwargs) -
                      Rotate.x(self.crlt * np.pi / 180) +
                      Rotate.y(crln * np.pi / 180))
         return transform
 
-    def to_synoptic(self, stonyhurst=False, reference='image', **kwargs):
+    def to_synoptic(self, stonyhurst=False, origin='image', **kwargs):
         crln = self.crln + self.tdel * WSID / 24 / 3600
 
         if stonyhurst:
@@ -172,16 +165,16 @@ class View:
             crln0 = crln
             wsyn = self.wsyn
 
-        transform = (~self.get_reference(reference, **kwargs) +
+        transform = (~self.get_transform(origin, **kwargs) +
                      self.to_carrington(**kwargs) +
                      ToSpherical() +
                      ToSynoptic(crln0, Wsid=WSID, Wsyn=wsyn, A=A, B=B, C=C) -
                      ToSpherical())
         return transform
 
-    def grid(self, reference='image', **kwargs):
+    def grid(self, origin='image', **kwargs):
         grid = np.mgrid[:self.nx, :self.ny].astype(np.float32)
-        transform = self.get_reference(reference, **kwargs)
+        transform = self.get_transform(origin, **kwargs)
         grid, _ = transform(grid)
         return grid
 
@@ -199,7 +192,7 @@ class View:
         return mu(r, rsun_arc = self.rsun_arc) * alpha
 
     def velocity(self, cbs=False, **kwargs):
-        grid = self.grid(reference='helioprojective', **kwargs)
+        grid = self.grid(origin='helioprojective', **kwargs)
 
         xi, yi, zi = grid
         grid, _ = Rotate.x(-self.crlt * np.pi / 180)(grid)

@@ -40,7 +40,7 @@ class Transform(ABC):
 
 class Pipe(Transform, list):
 
-    def __init__(self, *items):
+    def __init__(self, *items, **kwargs):
         super().__init__(items)
 
     def __call__(self, r, alpha=1):
