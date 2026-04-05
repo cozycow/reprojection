@@ -322,21 +322,22 @@ class ToSynoptic(Transform):
 
 class Filter(Transform):
 
-    def __init__(self, func, inv=False):
+    def __init__(self, func, inv=False, **kwargs):
         self.func = func
         self.inv = inv
+        self.kwargs = kwargs
 
     def __repr__(self):
         return f'Filter(func:{self.func}, inv:{self.inv})'
 
     def __call__(self, r, alpha=1):
         if not self.inv:
-            return r, alpha * self.func(r)
+            return r, alpha * self.func(r, **self.kwargs)
         else:
-            return r, alpha / self.func(r)
+            return r, alpha / self.func(r, **self.kwargs)
 
     def __invert__(self):
-        return type(self)(self.func, not self.inv)
+        return type(self)(self.func, not self.inv, **self.kwargs)
 
 
 class Custom(Transform):
