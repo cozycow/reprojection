@@ -192,28 +192,23 @@ class View:
         return mu(r, rsun_arc = self.rsun_arc) * alpha
 
     def velocity(self, cbs=False, **kwargs):
-        grid = self.grid(origin='helioprojective', **kwargs)
+        xi, yi, zi = self.grid(origin='carrington', **kwargs)
+        U = (A + B * yi ** 2 + C * yi ** 4) * RSUN * np.pi / 180 / 24 / 3600
 
-        xi, yi, zi = grid
-        grid, _ = Rotate.x(-self.crlt * np.pi / 180)(grid)
-
-        W = A + B * grid[1] ** 2 + C * grid[1] ** 4
-        U = RSUN * W * np.pi / 180 / 24 / 3600
-        ew, _ = Rotate.x(self.crlt * np.pi / 180)((0,1,0))
-
-        Vx = (ew[1] * zi - ew[2] * yi) * U - self.vw
-        Vy = ew[2] * xi * U - self.vn
-        Vz = -ew[1] * xi * U - self.vr
+        transform = (self.to_helioprojective(origin='carrington', **kwargs) -
+                     Translate((self.vw, self.vn, self.vr)))
+        v, _ = transform((zi * U, 0, -xi * U))
+        vx, vy, vz = v
+        xi, yi, zi = self.grid(origin='helioprojective', **kwargs)
 
         q = np.tan(self.rsun_arc * np.pi / 180 / 3600)
-        d = np.sqrt(q ** 2 - 2 * zi * q + 1)
-        V = (q * (xi * Vx + yi * Vy) + (q * zi - 1) * Vz) / d
+        d = np.sqrt(1 - 2 * zi * q + q ** 2)
+        V = (q * (xi * vx + yi * vy + zi * vz) - vz) / d
 
         if cbs:
             mu = (zi - q) / d
             V += np.polyval(P_CBS, mu)
         return V
-
 
 def reproject(data, header, header_new=None, **kwargs):
     '''
