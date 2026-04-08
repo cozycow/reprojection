@@ -207,6 +207,21 @@ class View:
         return V
 
 
+    def dr_velocity(self, **kwargs):
+        xi, yi, zi = self.grid(origin='carrington', **kwargs)
+        U = (A + B * yi ** 2 + C * yi ** 4) * RSUN * np.pi / 180 / 24 / 3600
+
+        transform = self.to_helioprojective(origin='carrington', **kwargs)
+        v, _ = transform((zi * U, 0, -xi * U))
+        vx, vy, vz = v
+        xi, yi, zi = self.grid(origin='helioprojective', **kwargs)
+
+        q = np.tan(self.rsun_arc * np.pi / 180 / 3600)
+        d = np.sqrt(1 - 2 * zi * q + q ** 2)
+        V = (q * (xi * vx + yi * vy + zi * vz) - vz) / d
+        return V
+
+
     def velocity(self, cbs=False, **kwargs):
         xi, yi, zi = self.grid(origin='carrington', **kwargs)
         U = (A + B * yi ** 2 + C * yi ** 4) * RSUN * np.pi / 180 / 24 / 3600
