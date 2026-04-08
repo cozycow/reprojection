@@ -55,15 +55,21 @@ class View:
         self.vn = vn
         self.wsyn = wsyn
 
-    def update(self, increment=False, **kwargs):
+    def update(self, increment=False, inplace=False, **kwargs):
+        if not inplace:
+            view_new = View(**self.__dict__)
+        else:
+            view_new = self
+
         for key, value in kwargs.items():
             if key in ['nx', 'ny', 'xc', 'yc', 'rsun', 'crota', 'crlt', 'crln', 'hgln', 'tdel',
                        'rsun_arc', 'vr', 'vw', 'vn', 'wsyn']:
                 if increment:
-                    setattr(self, key, getattr(self, key) + value)
+                    setattr(view_new, key, getattr(self, key) + value)
                 else:
-                    setattr(self, key, value)
-        return self
+                    setattr(view_new, key, value)
+
+        return view_new
 
     @classmethod
     def from_header(cls, header):
@@ -190,6 +196,16 @@ class View:
         else:
             r, alpha = transform(self.grid(**kwargs))
         return mu(r, rsun_arc = self.rsun_arc) * alpha
+
+
+    def sc_velocity(self, **kwargs):
+        xi, yi, zi = self.grid(origin='helioprojective', **kwargs)
+
+        q = np.tan(self.rsun_arc * np.pi / 180 / 3600)
+        d = np.sqrt(1 - 2 * zi * q + q ** 2)
+        V = (self.vr - q * (xi * self.vw + yi * self.vn + zi * self.vr) ) / d
+        return V
+
 
     def velocity(self, cbs=False, **kwargs):
         xi, yi, zi = self.grid(origin='carrington', **kwargs)
