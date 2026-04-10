@@ -129,7 +129,8 @@ class View:
             vn = 0.
 
         if 'DSUN_OBS' in header:
-            wsyn = WSID - vw / header['DSUN_OBS'] / np.pi * 180 * 24 * 60 * 60
+            d = header['DSUN_OBS'] * np.cos(crlt * np.pi / 180)
+            wsyn = WSID - vw / d / np.pi * 180 * 24 * 60 * 60
         else:
             wsyn = 0.
 
