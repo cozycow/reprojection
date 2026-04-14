@@ -109,7 +109,7 @@ class Translate(Transform):
 class Scale(Transform):
 
     def __new__(cls, *args, **kwargs):
-        if args[0] == 1:
+        if np.abs(args[0] - 1.) < 1e-8:
             return Pipe()
         else:
             return super().__new__(cls)
