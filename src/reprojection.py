@@ -139,7 +139,7 @@ class View:
     def get_transform(self, name='image', **kwargs):
         return getattr(self, 'to_' + name, Pipe)(**kwargs)
 
-    def to_helioprojective(self, correct_mu=False, mu_thr=0, origin='image', **kwargs):
+    def to_heliographic(self, correct_mu=False, mu_thr=0, origin='image', **kwargs):
         transform = (~self.get_transform(origin, **kwargs) -
                      Translate((self.xc, self.yc)) -
                      Scale(self.rsun) +
@@ -157,7 +157,7 @@ class View:
         crln = self.crln + self.tdel * WSID / 24 / 3600
 
         transform = (~self.get_transform(origin, **kwargs) +
-                     self.to_helioprojective(**kwargs) -
+                     self.to_heliographic(**kwargs) -
                      Rotate.x(self.crlt * np.pi / 180) +
                      Rotate.y(crln * np.pi / 180))
         return transform
@@ -191,7 +191,7 @@ class View:
         return bilinear(image, *grid) * alpha
 
     def mu(self, *args, **kwargs):
-        transform = self.to_helioprojective(correct_mu=False, **kwargs)
+        transform = self.to_heliographic(correct_mu=False, **kwargs)
         if len(args) > 0:
             r, alpha = transform(args)
         else:
@@ -200,7 +200,7 @@ class View:
 
 
     def sc_velocity(self, **kwargs):
-        xi, yi, zi = self.grid(origin='helioprojective', **kwargs)
+        xi, yi, zi = self.grid(origin='heliographic', **kwargs)
 
         q = np.tan(self.rsun_arc * np.pi / 180 / 3600)
         d = np.sqrt(1 - 2 * zi * q + q ** 2)
@@ -212,10 +212,10 @@ class View:
         xi, yi, zi = self.grid(origin='carrington', **kwargs)
         U = (A + B * yi ** 2 + C * yi ** 4) * RSUN * np.pi / 180 / 24 / 3600
 
-        transform = self.to_helioprojective(origin='carrington', **kwargs)
+        transform = self.to_heliographic(origin='carrington', **kwargs)
         v, _ = transform((zi * U, 0, -xi * U))
         vx, vy, vz = v
-        xi, yi, zi = self.grid(origin='helioprojective', **kwargs)
+        xi, yi, zi = self.grid(origin='heliographic', **kwargs)
 
         q = np.tan(self.rsun_arc * np.pi / 180 / 3600)
         d = np.sqrt(1 - 2 * zi * q + q ** 2)
@@ -227,11 +227,11 @@ class View:
         xi, yi, zi = self.grid(origin='carrington', **kwargs)
         U = (A + B * yi ** 2 + C * yi ** 4) * RSUN * np.pi / 180 / 24 / 3600
 
-        transform = (self.to_helioprojective(origin='carrington', **kwargs) -
+        transform = (self.to_heliographic(origin='carrington', **kwargs) -
                      Translate((self.vw, self.vn, self.vr)))
         v, _ = transform((zi * U, 0, -xi * U))
         vx, vy, vz = v
-        xi, yi, zi = self.grid(origin='helioprojective', **kwargs)
+        xi, yi, zi = self.grid(origin='heliographic', **kwargs)
 
         q = np.tan(self.rsun_arc * np.pi / 180 / 3600)
         d = np.sqrt(1 - 2 * zi * q + q ** 2)
