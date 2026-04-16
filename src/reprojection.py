@@ -6,6 +6,7 @@ from transforms import *
 WSID = 360 / 25.38
 WSYN = 360 / 27.2753
 AU = 149597870691.
+CLIGHT = 299792458
 RSUN = 696000000.
 A, B, C = 14.712, -2.396, -1.787  # differential rotation rates (Snodgrass & Ulrich, ApJ, 351, 309, 1990)
 #P_CBS = [-893, 4134, -7347, 6963, -3352, 223]  # convective blue shift coefficients for HMI (Stief et al., A&A, 622, A34, 2019)
@@ -21,8 +22,8 @@ def clip_mu(r, rsun_arc=0., thr=0.):
 
 
 class View:
-    def __init__(self, nx, ny, xc, yc, rsun, crota, crlt, crln, hgln=0., tdel=0.,
-                 rsun_arc=0., vr=0., vw=0., vn=0., wsyn=0.):
+    def __init__(self, nx, ny, xc, yc, rsun, crota, crlt, crln, hgln=0.,
+                 vr=0., vw=0., vn=0., rsun_arc=0., dsun=AU):
         '''
         A WCS information container.
 
@@ -48,12 +49,11 @@ class View:
         self.crlt = crlt
         self.crln = crln % 360
         self.hgln = hgln % 360
-        self.tdel = tdel
-        self.rsun_arc = rsun_arc
         self.vr = vr
         self.vw = vw
         self.vn = vn
-        self.wsyn = wsyn
+        self.rsun_arc = rsun_arc
+        self.dsun = dsun
 
     def update(self, increment=False, inplace=False, **kwargs):
         if not inplace:
@@ -62,8 +62,8 @@ class View:
             view_new = self
 
         for key, value in kwargs.items():
-            if key in ['nx', 'ny', 'xc', 'yc', 'rsun', 'crota', 'crlt', 'crln', 'hgln', 'tdel',
-                       'rsun_arc', 'vr', 'vw', 'vn', 'wsyn']:
+            if key in ['nx', 'ny', 'xc', 'yc', 'rsun', 'crota', 'crlt', 'crln', 'hgln',
+                       'vr', 'vw', 'vn', 'rsun_arc', 'dsun']:
                 if increment:
                     setattr(view_new, key, getattr(self, key) + value)
                 else:
@@ -93,25 +93,15 @@ class View:
 
         if 'CROTA' in header:
             crota = header['CROTA']
-        else:
+        elif 'CROTA2' in header:
             crota = header['CROTA2']
+        else:
+            crota = 0
 
         if 'HGLN_OBS' in header:
             hgln = header['HGLN_OBS']
         else:
             hgln = 0.
-
-        if 'EAR_TDEL' in header:
-            tdel = header['EAR_TDEL']
-        else:
-            tdel = 0.
-
-        if 'RSUN_ARC' in header:
-            rsun_arc = header['RSUN_ARC']
-        elif 'RSUN_OBS' in header:
-            rsun_arc = header['RSUN_OBS']
-        else:
-            rsun_arc = 0.
 
         if 'OBS_VR' in header:
             vr = header['OBS_VR']
@@ -128,13 +118,19 @@ class View:
         else:
             vn = 0.
 
-        if 'DSUN_OBS' in header:
-            d = header['DSUN_OBS'] * np.cos(crlt * np.pi / 180)
-            wsyn = WSID - vw / d / np.pi * 180 * 24 * 60 * 60
+        if 'RSUN_ARC' in header:
+            rsun_arc = header['RSUN_ARC']
+        elif 'RSUN_OBS' in header:
+            rsun_arc = header['RSUN_OBS']
         else:
-            wsyn = 0.
+            rsun_arc = 0.
 
-        return cls(nx, ny, xc, yc, rsun, crota, crlt, crln, hgln, tdel, rsun_arc, vr, vw, vn, wsyn)
+        if 'DSUN_OBS' in header:
+            dsun = header['DSUN_OBS'] * np.cos(crlt * np.pi / 180)
+        else:
+            dsun = AU
+
+        return cls(nx, ny, xc, yc, rsun, crota, crlt, crln, hgln, vr, vw, vn, rsun_arc, dsun)
 
     def get_transform(self, name='image', **kwargs):
         return getattr(self, 'to_' + name, Pipe)(**kwargs)
@@ -154,7 +150,8 @@ class View:
         return transform
 
     def to_carrington(self, origin='image', **kwargs):
-        crln = self.crln + self.tdel * WSID / 24 / 3600
+        tdel = (AU - self.dsun) / CLIGHT
+        crln = self.crln + tdel * WSID / 24 / 3600
 
         transform = (~self.get_transform(origin, **kwargs) +
                      self.to_heliographic(**kwargs) -
@@ -163,14 +160,15 @@ class View:
         return transform
 
     def to_synoptic(self, stonyhurst=False, origin='image', **kwargs):
-        crln = self.crln + self.tdel * WSID / 24 / 3600
+        tdel = (AU - self.dsun) / CLIGHT
+        crln = self.crln + tdel * WSID / 24 / 3600
 
         if stonyhurst:
             crln0 = crln - self.hgln
             wsyn = WSYN
         else:
             crln0 = crln
-            wsyn = self.wsyn
+            wsyn = WSID - self.vw / self.dsun / np.pi * 180 * 24 * 60 * 60
 
         transform = (~self.get_transform(origin, **kwargs) +
                      self.to_carrington(**kwargs) +
@@ -197,7 +195,6 @@ class View:
         else:
             r, alpha = transform(self.grid(**kwargs))
         return mu(r, rsun_arc = self.rsun_arc) * alpha
-
 
     def sc_velocity(self, **kwargs):
         xi, yi, zi = self.grid(origin='heliographic', **kwargs)
