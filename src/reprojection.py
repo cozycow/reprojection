@@ -1,5 +1,5 @@
 import numpy as np
-from interpolation import bilinear
+from interpolation import interp2d
 from transforms import *
 
 
@@ -13,12 +13,12 @@ A, B, C = 14.712, -2.396, -1.787  # differential rotation rates (Snodgrass & Ulr
 P_CBS = [-768, 2073, -1785, 462] # FDT fit
 
 
-def mu(r, rsun_arc=0.):
+def func_mu(r, rsun_arc=0.):
     q = np.tan(rsun_arc / 3600 * np.pi / 180)
     return (r[2] - q) / np.sqrt(1 - 2 * r[2] * q + q ** 2)
 
 def clip_mu(r, rsun_arc=0., thr=0.):
-    return np.where(mu(r, rsun_arc=rsun_arc) > thr, 1, np.nan)
+    return np.where(func_mu(r, rsun_arc=rsun_arc) > thr, 1, np.nan)
 
 
 class View:
@@ -138,10 +138,10 @@ class View:
     def to_heliographic(self, correct_mu=False, mu_thr=0, origin='image', **kwargs):
         transform = (~self.get_transform(origin, **kwargs) +
                      Normalize((self.xc, self.yc), self.rsun) +
-                     Make3d(theta=self.rsun_arc / 3600))
+                     Make3d(self.rsun_arc / 3600))
 
         if correct_mu:
-            transform += Filter(mu, rsun_arc=self.rsun_arc)
+            transform += Filter(func_mu, rsun_arc=self.rsun_arc)
 
         transform += (Filter(clip_mu, rsun_arc=self.rsun_arc, thr=mu_thr) +
                       Rotate.z(self.crota * np.pi / 180))
@@ -184,32 +184,23 @@ class View:
     def reproject(self, image, view, **kwargs):
         transform = self.to_carrington(**kwargs) - view.to_carrington(**kwargs)
         grid, alpha = transform(self.grid(**kwargs))
-        return bilinear(image, *grid) * alpha
+        return interp2d(image, *grid, **kwargs) * alpha
 
     def mu(self, *args, **kwargs):
-        transform = self.to_heliographic(correct_mu=False, **kwargs)
+        transform = self.to_heliographic(correct_mu=True, **kwargs)
         if len(args) > 0:
-            r, alpha = transform(args)
+            _, alpha = transform(args)
         else:
-            r, alpha = transform(self.grid(**kwargs))
-        return mu(r, rsun_arc = self.rsun_arc) * alpha
+            _, alpha = transform(self.grid(**kwargs))
+        return alpha
 
-    def sc_velocity(self, **kwargs):
-        xi, yi, zi = self.grid(origin='heliographic', **kwargs)
-
-        q = np.tan(self.rsun_arc * np.pi / 180 / 3600)
-        d = np.sqrt(1 - 2 * zi * q + q ** 2)
-        V = (self.vr - q * (xi * self.vw + yi * self.vn + zi * self.vr) ) / d
-        return V
-
-
-    def dr_velocity(self, **kwargs):
+    def velocity(self, **kwargs):
         xi, yi, zi = self.grid(origin='carrington', **kwargs)
         U = (A + B * yi ** 2 + C * yi ** 4) * RSUN * np.pi / 180 / 24 / 3600
 
         transform = self.to_heliographic(origin='carrington', **kwargs)
         v, _ = transform((zi * U, 0, -xi * U))
-        vx, vy, vz = v
+        vx, vy, vz = v[0] - self.vw, v[1] - self.vn, v[2] - self.vr
         xi, yi, zi = self.grid(origin='heliographic', **kwargs)
 
         q = np.tan(self.rsun_arc * np.pi / 180 / 3600)
@@ -217,25 +208,6 @@ class View:
         V = (q * (xi * vx + yi * vy + zi * vz) - vz) / d
         return V
 
-
-    def velocity(self, cbs=False, **kwargs):
-        xi, yi, zi = self.grid(origin='carrington', **kwargs)
-        U = (A + B * yi ** 2 + C * yi ** 4) * RSUN * np.pi / 180 / 24 / 3600
-
-        transform = (self.to_heliographic(origin='carrington', **kwargs) -
-                     Translate((self.vw, self.vn, self.vr)))
-        v, _ = transform((zi * U, 0, -xi * U))
-        vx, vy, vz = v
-        xi, yi, zi = self.grid(origin='heliographic', **kwargs)
-
-        q = np.tan(self.rsun_arc * np.pi / 180 / 3600)
-        d = np.sqrt(1 - 2 * zi * q + q ** 2)
-        V = (q * (xi * vx + yi * vy + zi * vz) - vz) / d
-
-        if cbs:
-            mu = (zi - q) / d
-            V += np.polyval(P_CBS, mu)
-        return V
 
 def reproject(data, header, header_new=None, **kwargs):
     '''
@@ -280,6 +252,6 @@ def remap(data, header, dlon=1, dlat=1, **kwargs):
 
     grid = np.mgrid[-90:90 + dlat / 2:dlat, -180:180:dlon]
     grid, alpha = transform(grid)
-    data = bilinear(data, *grid) * alpha
+    data = interp2d(data, *grid, **kwargs) * alpha
     return data
 

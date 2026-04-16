@@ -28,8 +28,9 @@ def hmize(image, fdt=None, hmi=None):
     return image_
 
 
-def undistort(image, header, xd, yd):
-    from interpolation import bilinear
+def undistort(image, header, xd, yd, **kwargs):
+    from interpolation import interp2d
     nx, ny = header['NAXIS2'], header['NAXIS1']
     x0, y0 = header['PXBEG2'] - 1, header['PXBEG1'] - 1
-    return bilinear(image, xd[x0:x0 + nx, y0:y0 + ny] - x0, yd[x0:x0 + nx, y0:y0 + ny] - y0)
+    return interp2d(image, xd[x0:x0 + nx, y0:y0 + ny] - x0, yd[x0:x0 + nx, y0:y0 + ny] - y0, **kwargs)
+

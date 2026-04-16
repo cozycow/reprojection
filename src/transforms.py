@@ -79,60 +79,6 @@ class Pipe(Transform, list):
             return (other + self[0]) + self[1:]
 
 
-class Translate(Transform):
-
-    def __new__(cls, *args, **kwargs):
-        if all(x == 0 for x in args[0]):
-            return Pipe()
-        else:
-            return super().__new__(cls)
-
-    def __init__(self, shift):
-        self.shift = shift
-
-    def __repr__(self):
-        return f'Translate(shift:{self.shift})'
-
-    def __call__(self, r, alpha=1):
-        return tuple(x + dx for x, dx in zip(r, self.shift)), alpha
-
-    def __invert__(self):
-        return type(self)(tuple(-x for x in self.shift))
-
-    def __add__(self, other):
-        if isinstance(other, type(self)):
-            return type(self)(tuple(x + y for x, y in zip(self.shift, other.shift)))
-        else:
-            return super().__add__(other)
-
-
-class Scale(Transform):
-
-    def __new__(cls, *args, **kwargs):
-        if abs(args[0] - 1.) < 1e-8:
-            return Pipe()
-        else:
-            return super().__new__(cls)
-
-    def __init__(self, factor):
-        self.factor = factor
-
-    def __repr__(self):
-        return f'Scale(factor:{self.factor})'
-
-    def __call__(self, r, alpha=1):
-        return tuple(self.factor * x for x in r), alpha
-
-    def __invert__(self):
-        return type(self)(1 / self.factor)
-
-    def __add__(self, other):
-        if isinstance(other, type(self)):
-            return type(self)(self.factor * other.factor)
-        else:
-            return super().__add__(other)
-
-
 class Normalize(Transform):
     def __new__(cls, *args, **kwargs):
         if all(x == 0 for x in args[0]) and (abs(args[1] - 1.) < 1e-8):
@@ -158,6 +104,50 @@ class Normalize(Transform):
             return type(self)(tuple(x + y * self.scale for x, y in zip(self.shift, other.shift)), self.scale * other.scale)
         else:
             return super().__add__(other)
+
+
+class Make3d(Transform):
+
+    def __init__(self, theta, inv=False):
+        self.theta = theta
+        self.inv = inv
+
+    def __repr__(self):
+        return f'Make3d(theta:{self.theta}, inv:{self.inv})'
+
+    def __paraxial(self, r):
+        x, y, z = r
+        q = np.tan(self.theta * np.pi / 180)
+        u = np.sqrt(1 - q ** 2) / (1 + q * z)
+        x, y = x * u, y * u
+        z = (z + q) / (1 + q * z)
+        return x, y, z
+
+    def __call__(self, r, alpha=1):
+        if not self.inv:
+            x, y = r
+            z2 = 1 - x ** 2 - y ** 2
+            if isinstance(z2, np.ndarray):
+                t = np.where(z2 < 0)
+                x[t], y[t], z2[t] = np.nan, np.nan, np.nan
+            else:
+                if z2 < 0:
+                    x, y = np.nan, np.nan
+            return self.__paraxial((y, x, np.sqrt(z2))), alpha
+        else:
+            x, y, z = self.__paraxial(r)
+
+            if isinstance(z, np.ndarray):
+                t = np.where(z < 0)
+                x[t], y[t] = np.nan, np.nan
+            else:
+                if z < 0:
+                    x, y = np.nan, np.nan
+
+            return (y, x), alpha
+
+    def __invert__(self):
+        return type(self)(-self.theta, not self.inv)
 
 
 class Rotate(Transform):
@@ -223,72 +213,6 @@ class Rotate(Transform):
             return other * self
         else:
             return super().__add__(other)
-
-
-class Make3d(Transform):
-
-    def __init__(self, theta, inv=False):
-        self.theta = theta
-        self.inv = inv
-
-    def __repr__(self):
-        return f'Make3d(theta:{self.theta}, inv:{self.inv})'
-
-    def __paraxial(self, r):
-        x, y, z = r
-        q = np.tan(self.theta * np.pi / 180)
-        u = np.sqrt(1 - q ** 2) / (1 + q * z)
-        x, y = x * u, y * u
-        z = (z + q) / (1 + q * z)
-        return x, y, z
-
-    def __call__(self, r, alpha=1):
-        if not self.inv:
-            x, y = r
-            z2 = 1 - x ** 2 - y ** 2
-            if isinstance(z2, np.ndarray):
-                t = np.where(z2 < 0)
-                x[t], y[t], z2[t] = np.nan, np.nan, np.nan
-            else:
-                if z2 < 0:
-                    x, y = np.nan, np.nan
-            return self.__paraxial((y, x, np.sqrt(z2))), alpha
-        else:
-            x, y, z = self.__paraxial(r)
-
-            if isinstance(z, np.ndarray):
-                t = np.where(z < 0)
-                x[t], y[t] = np.nan, np.nan
-            else:
-                if z < 0:
-                    x, y = np.nan, np.nan
-
-            return (y, x), alpha
-
-    def __invert__(self):
-        return type(self)(-self.theta, not self.inv)
-
-
-class _ToParaxial(Transform):
-
-    def __init__(self, theta=0):
-        self.theta = theta
-
-    def __repr__(self):
-        return f'ToParaxial(theta:{self.theta})'
-
-    def __call__(self, r, alpha=1):
-        x, y, z = r
-
-        q = np.tan(self.theta * np.pi / 180)
-        u = np.sqrt(1 - q ** 2) / (1 + q * z)
-        x, y = x * u, y * u
-        z = (z + q) / (1 + q * z)
-
-        return (x, y, z), alpha
-
-    def __invert__(self):
-        return type(self)(-self.theta)
 
 
 class ToSpherical(Transform):
