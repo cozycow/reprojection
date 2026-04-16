@@ -133,6 +133,33 @@ class Scale(Transform):
             return super().__add__(other)
 
 
+class Normalize(Transform):
+    def __new__(cls, *args, **kwargs):
+        if all(x == 0 for x in args[0]) and (abs(args[1] - 1.) < 1e-8):
+            return Pipe()
+        else:
+            return super().__new__(cls)
+
+    def __init__(self, shift, scale):
+        self.shift = shift
+        self.scale = scale
+
+    def __repr__(self):
+        return f'Normalize(shift:{self.shift}, scale:{self.scale})'
+
+    def __call__(self, r, alpha=1):
+        return tuple((x - a) / self.scale for x, a in zip(r, self.shift)), alpha
+
+    def __invert__(self):
+        return type(self)(tuple(-x / self.scale for x in self.shift), 1 / self.scale)
+
+    def __add__(self, other):
+        if isinstance(other, type(self)):
+            return type(self)(tuple(x + y * self.scale for x, y in zip(self.shift, other.shift)), self.scale * other.scale)
+        else:
+            return super().__add__(other)
+
+
 class Rotate(Transform):
 
     def __new__(cls, *args, **kwargs):
@@ -198,13 +225,22 @@ class Rotate(Transform):
             return super().__add__(other)
 
 
-class Expand(Transform):
+class Make3d(Transform):
 
-    def __init__(self, inv=False):
+    def __init__(self, theta, inv=False):
+        self.theta = theta
         self.inv = inv
 
     def __repr__(self):
-        return f'Expand(inv:{self.inv})'
+        return f'Make3d(theta:{self.theta}, inv:{self.inv})'
+
+    def __paraxial(self, r):
+        x, y, z = r
+        q = np.tan(self.theta * np.pi / 180)
+        u = np.sqrt(1 - q ** 2) / (1 + q * z)
+        x, y = x * u, y * u
+        z = (z + q) / (1 + q * z)
+        return x, y, z
 
     def __call__(self, r, alpha=1):
         if not self.inv:
@@ -216,9 +252,9 @@ class Expand(Transform):
             else:
                 if z2 < 0:
                     x, y = np.nan, np.nan
-            return (y, x, np.sqrt(z2)), alpha
+            return self.__paraxial((y, x, np.sqrt(z2))), alpha
         else:
-            x, y, z = r
+            x, y, z = self.__paraxial(r)
 
             if isinstance(z, np.ndarray):
                 t = np.where(z < 0)
@@ -230,10 +266,10 @@ class Expand(Transform):
             return (y, x), alpha
 
     def __invert__(self):
-        return type(self)(not self.inv)
+        return type(self)(-self.theta, not self.inv)
 
 
-class ToParaxial(Transform):
+class _ToParaxial(Transform):
 
     def __init__(self, theta=0):
         self.theta = theta

@@ -136,11 +136,9 @@ class View:
         return getattr(self, 'to_' + name, Pipe)(**kwargs)
 
     def to_heliographic(self, correct_mu=False, mu_thr=0, origin='image', **kwargs):
-        transform = (~self.get_transform(origin, **kwargs) -
-                     Translate((self.xc, self.yc)) -
-                     Scale(self.rsun) +
-                     Expand() +
-                     ToParaxial(theta=self.rsun_arc / 3600))
+        transform = (~self.get_transform(origin, **kwargs) +
+                     Normalize((self.xc, self.yc), self.rsun) +
+                     Make3d(theta=self.rsun_arc / 3600))
 
         if correct_mu:
             transform += Filter(mu, rsun_arc=self.rsun_arc)
