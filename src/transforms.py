@@ -81,7 +81,7 @@ class Pipe(Transform, list):
 
 class Normalize(Transform):
     def __new__(cls, *args, **kwargs):
-        if all(x == 0 for x in args[0]) and (abs(args[1] - 1.) < 1e-8):
+        if all(np.abs(x) < 1e-8 for x in args[0]) and (abs(args[1] - 1.) < 1e-8):
             return Pipe()
         else:
             return super().__new__(cls)

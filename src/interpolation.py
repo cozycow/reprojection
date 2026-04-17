@@ -2,6 +2,10 @@ import numpy as np
 
 
 def interp2d(image, x, y, kind='bilinear', **kwargs):
+
+    def __nearest(z):
+        return np.where(z <= 0.5, 1, 0)
+
     def __bilinear(z):
         return 1 - np.abs(z)
 
@@ -13,8 +17,11 @@ def interp2d(image, x, y, kind='bilinear', **kwargs):
     if kind == 'bicubic':
         kernel = __bicubic
         nodes = range(-1,3)
-    else:
+    elif kind == 'bilinear':
         kernel = __bilinear
+        nodes = range(0,2)
+    else:
+        kernel = __nearest
         nodes = range(0,2)
 
     nx, ny = image.shape
@@ -33,7 +40,7 @@ def interp2d(image, x, y, kind='bilinear', **kwargs):
     return image_
 
 
-def interpolate(f, x, x_new):
+def interp1d(f, x, x_new):
     idx = np.searchsorted(x, x_new).clip(1, len(x) - 1)
 
     xa = x[idx - 1]

@@ -19,18 +19,14 @@ def rebin(image, k, axis=None, update_header=None):
         return rebin(rebin(image, k, axis=0, update_header=update_header), k, axis=1, update_header=update_header)
 
 
-def hmize(image, fdt=None, hmi=None):
-    from interpolation import interpolate
-    image_ = image.copy()
-
-    if fdt is not None and hmi is not None:
-        image_ = interpolate(hmi, fdt, image_.flatten()).reshape(image.shape)
-    return image_
+def crop_grid(xi, yi, header):
+    nx, ny = header['NAXIS2'], header['NAXIS1']
+    x0, y0 = header['PXBEG2'] - 1, header['PXBEG1'] - 1
+    return xi[x0:x0 + nx, y0:y0 + ny] - x0, yi[x0:x0 + nx, y0:y0 + ny] - y0
 
 
 def undistort(image, header, xd, yd, **kwargs):
     from interpolation import interp2d
-    nx, ny = header['NAXIS2'], header['NAXIS1']
-    x0, y0 = header['PXBEG2'] - 1, header['PXBEG1'] - 1
-    return interp2d(image, xd[x0:x0 + nx, y0:y0 + ny] - x0, yd[x0:x0 + nx, y0:y0 + ny] - y0, **kwargs)
+    xd_, yd_ = crop_grid(xd, yd, header)
+    return interp2d(image, xd_, yd_, **kwargs)
 

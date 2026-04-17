@@ -181,10 +181,13 @@ class View:
         grid, _ = transform(grid)
         return grid
 
-    def reproject(self, image, view, **kwargs):
+    def reproject(self, image, view, grid=None, **kwargs):
         transform = self.to_carrington(**kwargs) - view.to_carrington(**kwargs)
-        grid, alpha = transform(self.grid(**kwargs))
-        return interp2d(image, *grid, **kwargs) * alpha
+        if grid is None:
+            grid = self.grid(**kwargs)
+
+        grid_, alpha = transform(grid)
+        return interp2d(image, *grid_, **kwargs) * alpha
 
     def mu(self, *args, **kwargs):
         transform = self.to_heliographic(correct_mu=True, **kwargs)
