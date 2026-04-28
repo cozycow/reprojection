@@ -1,10 +1,10 @@
 import numpy as np
 
 
-def interp2d(image, x, y, kind='bilinear', **kwargs):
+def interp2d(image, x, y, kind='bicubic', roll=False, **kwargs):
 
     def __nearest(z):
-        return np.where(z <= 0.5, 1, 0)
+        return np.where(np.abs(z) <= 0.5, 1, 0)
 
     def __bilinear(z):
         return 1 - np.abs(z)
@@ -14,7 +14,16 @@ def interp2d(image, x, y, kind='bilinear', **kwargs):
         return np.where(z_ <= 1, 1.5 * z_ ** 3 - 2.5 * z_ ** 2 + 1,
                         -0.5 * z_ ** 3 + 2.5 * z_ ** 2 - 4 * z_ + 2)
 
-    if kind == 'bicubic':
+    def __quadratic(z):
+        z_ = np.abs(z)
+        return np.where(z_ <= 1, 4 * z_ ** 3 / 3 - 7 * z_ ** 2 / 3 + 1,
+                        np.where(z_ <= 2, -7 * z_ ** 3 / 12 + 3 * z_ ** 2 - 59 * z_ / 12 + 15 / 6,
+                                 z_ ** 3 / 12 - 2 * z_ ** 2 / 3 + 21 * z_ / 12 - 3 / 2))
+
+    if kind == 'quadratic':
+        kernel = __quadratic
+        nodes = range(-2,4)
+    elif kind == 'bicubic':
         kernel = __bicubic
         nodes = range(-1,3)
     elif kind == 'bilinear':
@@ -29,13 +38,15 @@ def interp2d(image, x, y, kind='bilinear', **kwargs):
     y_ = np.nan_to_num(np.floor(y), nan=ny).astype(np.int16)
     dx, dy = x - x_, y - y_
 
-    image_ = np.zeros_like(x).astype(np.float32)
+    image_ = 0
     for i in nodes:
         kernel_ = kernel(i - dx)
         for j in nodes:
-            xi, yj = x_ + i, y_ + j
-            temp = image[xi % nx, yj % ny] * kernel_ * kernel(j - dy)
-            image_ += temp
+            if roll:
+                temp = np.roll(image, (x_ + i, y_ + j), axis=(0, 1))
+            else:
+                temp = image[(x_ + i) % nx, (y_ + j) % ny]
+            image_ += temp * kernel_ * kernel(j - dy)
 
     return image_
 

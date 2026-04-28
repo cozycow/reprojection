@@ -181,12 +181,19 @@ class View:
         grid, _ = transform(grid)
         return grid
 
-    def reproject(self, image, view, grid=None, **kwargs):
+    def reproject(self, image, view, grid=None, distort=None, **kwargs):
         transform = self.to_carrington(**kwargs) - view.to_carrington(**kwargs)
         if grid is None:
             grid = self.grid(**kwargs)
 
         grid_, alpha = transform(grid)
+
+        if distort is not None:
+            xd, yd = distort
+            xi = interp2d(xd, *grid_, kind='bilinear')
+            yi = interp2d(yd, *grid_, kind='bilinear')
+            grid_ = (xi, yi)
+
         return interp2d(image, *grid_, **kwargs) * alpha
 
     def mu(self, *args, **kwargs):
