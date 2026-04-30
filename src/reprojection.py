@@ -55,9 +55,13 @@ class View:
         self.rsun_arc = rsun_arc
         self.dsun = dsun
 
+
+    def copy(self):
+        return View(**self.__dict__)
+
     def update(self, increment=False, inplace=False, **kwargs):
         if not inplace:
-            view_new = View(**self.__dict__)
+            view_new = self.copy()
         else:
             view_new = self
 
@@ -82,6 +86,7 @@ class View:
 
         nx, ny = header['NAXIS2'], header['NAXIS1']
         xc, yc = header['CRPIX2'] - 1, header['CRPIX1'] - 1
+
         crlt, crln = header['CRLT_OBS'], header['CRLN_OBS']
 
         if 'RADIUS' in header:
