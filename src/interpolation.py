@@ -52,16 +52,16 @@ def interp2d(image, x, y, kind='bicubic', roll=False, **kwargs):
 
 
 def interp1d(f, x, x_new):
+    if isinstance(x_new, np.ndarray):
+        return np.array([interp1d(f, x, x_new_) for x_new_ in x_new])
+
     idx = np.searchsorted(x, x_new).clip(1, len(x) - 1)
 
-    xa = x[idx - 1]
-    xb = x[idx]
+    xa, xb = x[idx - 1], x[idx]
+    fa, fb = f[idx - 1], f[idx]
+
     dx = xb - xa
-
     a, b = (xb - x_new) / dx, (x_new - xa) / dx
-
-    fa = np.take_along_axis(f, idx - 1, axis=0)
-    fb = np.take_along_axis(f, idx, axis=0)
 
     f_new = fa * a + fb * b
     return f_new
