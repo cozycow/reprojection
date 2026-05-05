@@ -229,6 +229,7 @@ class ToSpherical(Transform):
             return (theta, phi), alpha
         else:
             theta, phi = r
+
             y = np.sin(theta * np.pi / 180)
             x, z = (np.cos(theta * np.pi / 180) * np.sin(phi * np.pi / 180),
                     np.cos(theta * np.pi / 180) * np.cos(phi * np.pi / 180))
@@ -273,10 +274,12 @@ class ToSynoptic(Transform):
             q = 1 / q
 
         dphi = (phi - self.crln - 180) % 360 - 180
-        #dphi[dphi < 0] = np.nan
-        dphi[np.abs(dphi) > 30] = np.nan
+        phi = self.crln + dphi * q
 
-        return (theta, self.crln + dphi * q), alpha
+        phi[phi < self.crln * (1 - q)] = np.nan
+        phi[phi > self.crln * (1 - q) + 360 * q] = np.nan
+
+        return (theta, phi), alpha
 
     def __invert__(self):
         return type(self)(self.crln, A=self.A, B=self.B, C=self.C, Wsid=self.Wsid, Wsyn=self.Wsyn, inv=not self.inv)

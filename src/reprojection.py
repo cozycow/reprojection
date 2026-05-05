@@ -131,7 +131,7 @@ class View:
             rsun_arc = 0.
 
         if 'DSUN_OBS' in header:
-            dsun = header['DSUN_OBS'] * np.cos(crlt * np.pi / 180)
+            dsun = header['DSUN_OBS']
         else:
             dsun = AU
 
@@ -171,7 +171,7 @@ class View:
             wsyn = WSYN
         else:
             crln0 = crln
-            wsyn = WSID - self.vw / self.dsun / np.pi * 180 * 24 * 60 * 60
+            wsyn = WSID - self.vw / self.dsun / np.cos(self.crlt * np.pi / 180) / np.pi * 180 * 24 * 60 * 60
 
         transform = (~self.get_transform(origin, **kwargs) +
                      self.to_carrington(**kwargs) +

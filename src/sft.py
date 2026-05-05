@@ -30,3 +30,10 @@ def diffuse(y, xi, d, dt, ai=None):
     A = a - np.roll(U, -1) - np.roll(L, 1)
     B = a * y
     return solve_banded((1, 1), [U, A, L], B, True, True)
+
+
+def flow(x, a=0.5, x0=None):
+    y = np.sin(2 * x * np.pi / 180) + a * np.sin(4 * x * np.pi / 180) + (2 * a - 1) / 3 * np.sin(6 * x * np.pi / 180)
+    if x0 is not None:
+        y /= flow(x0, a=a)
+    return y
