@@ -1,10 +1,14 @@
 import numpy as np
 
 
-def advect(y, xi, vi, dt, ai=None, boundary='mirror'):
+def advect(y, vi, dt, dx=1, xi=None, ai=None, boundary='mirror'):
+    if xi is not None:
+        dx = xi[1:] - xi[:-1]
+
     if ai is None:
-        ai = np.ones_like(xi)
-    a = (ai[1:] + ai[:-1]) / 2
+        ai = a = 1
+    else:
+        a = (ai[:-1] + ai[1:]) / 2
 
     if boundary == 'mirror':
         yl = yr = 0.
@@ -12,25 +16,31 @@ def advect(y, xi, vi, dt, ai=None, boundary='mirror'):
         yl, yr = y[[-1,0]]
 
     Fi = vi * ai * np.where(vi > 0, np.append(yl, y), np.append(y, yr))
-    dF_dx = (Fi[1:] - Fi[:-1]) / (xi[1:] - xi[:-1])
+    dF_dx = (Fi[1:] - Fi[:-1]) / dx
     return y - dF_dx / a * dt
 
 
-def diffuse(y, xi, d, dt, ai=None):
+def diffuse(y, d, dt, dx=1, xi=None, ai=None):
     from scipy.linalg import solve_banded
+    if xi is not None:
+        x = (xi[1:] + xi[:-1]) / 2
+        dxl = x - np.roll(x, 1)
+        dxr = np.roll(x, -1) - x
+        dxi = xi[1:] - xi[:-1]
+    else:
+        dxi = dxl = dxr = dx
+
     if ai is None:
-        ai = np.ones_like(xi)
+        a = al = ar = 1
+    else:
+        al = ai[:-1]
+        ar = ai[1:]
+        a = (al + ar) / 2
 
-    a = (ai[1:] + ai[:-1]) / 2
-    x = (xi[1:] + xi[:-1]) / 2
-
-    dx = x - np.roll(x, 1)
-    dxi = xi[1:] - xi[:-1]
-
-    ql = d * dt * ai[:-1] / a / dx / dxi / 2
+    ql = d * dt * al / a / dxl / dxi / 2 * np.ones_like(y)
     ql[0] = 0
 
-    qr = d * dt * ai[1:] / a / np.roll(dx, -1) / dxi / 2
+    qr = d * dt * ar / a / dxr / dxi / 2 * np.ones_like(y)
     qr[-1] = 0
 
     L = - np.roll(ql, -1)
