@@ -153,7 +153,6 @@ class Make3d(Transform):
 class Rotate(Transform):
 
     def __new__(cls, *args, **kwargs):
-
         if not isinstance(args[0], np.ndarray) and args[0] == 1:
             return Pipe()
         else:
@@ -273,11 +272,9 @@ class ToSynoptic(Transform):
         if self.inv:
             q = 1 / q
 
-        dphi = (phi - self.crln - 180) % 360 - 180
+        dphi = phi - self.crln
+        dphi[np.abs(dphi) > 22.5] = np.nan
         phi = self.crln + dphi * q
-
-        phi[phi < self.crln * (1 - q)] = np.nan
-        phi[phi > self.crln * (1 - q) + 360 * q] = np.nan
 
         return (theta, phi), alpha
 
