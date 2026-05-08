@@ -2,8 +2,14 @@ import numpy as np
 
 
 def advect(y, vi, dt, dx=1, xi=None, ai=None, boundary='reflect'):
+    def superbee(x):
+        return np.max([(2 * x).clip(0,1), x.clip(0,2)], axis=0)
+
     if xi is not None:
-        dx = xi[1:] - xi[:-1]
+        dxi = xi[1:] - xi[:-1]
+        dx = (np.roll(xi, -1) - np.roll(xi, 1)) / 2
+    else:
+        dxi = dx
 
     if ai is None:
         ai = a = 1
@@ -19,8 +25,13 @@ def advect(y, vi, dt, dx=1, xi=None, ai=None, boundary='reflect'):
     else:
         yl, yr = boundary
 
-    Fi = vi * ai * np.where(vi > 0, np.append(yl, y), np.append(y, yr))
-    dF_dx = (Fi[1:] - Fi[:-1]) / dx
+    ql, qr = ai * np.append(yl, y), ai * np.append(y, yr)
+    dq = qr - ql
+
+    ri = np.where(vi > 0, np.roll(dq, 1) * dq / (dq ** 2 + 1e-16), np.roll(dq, -1) * dq / (dq ** 2 + 1e-16))
+    Fi = vi * np.where(vi > 0, ql, qr) + 0.5 * np.abs(vi) * (1 - np.abs(vi * dt / dx)) * superbee(ri) * dq
+
+    dF_dx = (Fi[1:] - Fi[:-1]) / dxi
     return y - dF_dx / a * dt
 
 
