@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def interp2d(image, x, y, kind='bicubic', roll=False, **kwargs):
+def interp2d(image, x, y, kind='bicubic', roll=False, boundary=('periodic', 'periodic'), **kwargs):
 
     def __nearest(z):
         return np.where(np.abs(z) <= 0.5, 1, 0)
@@ -45,7 +45,17 @@ def interp2d(image, x, y, kind='bicubic', roll=False, **kwargs):
             if roll:
                 temp = np.roll(image, (x_ + i, y_ + j), axis=(0, 1))
             else:
-                temp = image[(x_ + i) % nx, (y_ + j) % ny]
+                if boundary[0] == 'periodic':
+                    xi = (x_ + i) % nx
+                else:
+                    xi = (x_ + i).clip(0,nx-1)
+
+                if boundary[1] == 'periodic':
+                    yj = (y_ + j) % ny
+                else:
+                    yj = (y_ + j).clip(0,ny-1)
+                temp = image[xi, yj]
+
             image_ += temp * kernel_ * kernel(j - dy)
 
     return image_

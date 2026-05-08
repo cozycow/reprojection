@@ -66,9 +66,10 @@ def diffuse(y, d, dt, dx=1, xi=None, ai=None):
 
 def diffuse_fft(y, d, dt, dx=1):
     from numpy.fft import fft, ifft, fftfreq
-    q = d * dt / dx ** 2
     f = fftfreq(len(y))
-    a = fft(y) / (1 + 2 * q * (1 - np.cos(2 * np.pi * f)))
+    q = d * dt / dx ** 2
+    p = q * (1 - np.cos(2 * np.pi * f))
+    a = fft(y) * (1 - p) / (1 + p)
     return np.real(ifft(a))
 
 
