@@ -53,8 +53,22 @@ def diffuse(y, d, dt, dx=1, xi=None, ai=None):
     return solve_banded((1, 1), [U, A, L], B, True, True)
 
 
+def diffuse_fft(y, d, dt, dx=1):
+    from numpy.fft import fft, ifft, fftfreq
+    q = d * dt / dx ** 2
+    f = fftfreq(len(y))
+    a = fft(y) / (1 + 2 * q * (1 - np.cos(2 * np.pi * f)))
+    return np.real(ifft(a))
+
+
 def flow(x, a=0.5, x0=None):
     y = np.sin(2 * x * np.pi / 180) + a * np.sin(4 * x * np.pi / 180) + (2 * a - 1) / 3 * np.sin(6 * x * np.pi / 180)
     if x0 is not None:
         y /= flow(x0, a=a)
     return y
+
+
+def rotation(x, a=14.712, b=-2.396, c=-1.787):
+    sin2 = np.sin(x * np.pi / 180) ** 2
+    return a + b * sin2 + c * sin2 ** 2
+

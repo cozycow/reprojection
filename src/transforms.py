@@ -263,9 +263,9 @@ class ToSynoptic(Transform):
 
     def __call__(self, r, alpha=1):
         theta, phi = r
-        sin_theta = np.sin(theta * np.pi / 180)
+        sin2 = np.sin(theta * np.pi / 180) ** 2
 
-        W = self.A + self.B * sin_theta ** 2 + self.C * sin_theta ** 4
+        W = self.A + self.B * sin2 + self.C * sin2 ** 2
         Wobs = self.Wsid - self.Wsyn
 
         q = 1 - (W - self.Wsid) / (W - Wobs)
