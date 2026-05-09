@@ -2,14 +2,19 @@ import numpy as np
 
 
 def advect(y, vi, dt, dx=1, xi=None, ai=None, boundary='reflect'):
-    def superbee(x):
-        return np.max([(2 * x).clip(0,1), x.clip(0,2)], axis=0)
+    def minmod(a, b):
+        return np.where(a * b > 0, np.where(np.abs(a) < np.abs(b), a, b), 0)
+
+    def maxmod(a, b):
+        return np.where(a * b > 0, np.where(np.abs(a) > np.abs(b), a, b), 0)
+
+    def superbee(a, b):
+        return maxmod(minmod(a, 2 * b), minmod(2 * a, b))
 
     if xi is not None:
         dxi = xi[1:] - xi[:-1]
-        dx = (np.roll(xi, -1) - np.roll(xi, 1)) / 2
     else:
-        dxi = dx
+        dxi = dx * np.ones_like(y)
 
     if ai is None:
         ai = a = 1
@@ -17,20 +22,25 @@ def advect(y, vi, dt, dx=1, xi=None, ai=None, boundary='reflect'):
         a = (ai[:-1] + ai[1:]) / 2
 
     if boundary == 'reflect':
-        yl = yr = 0.
+        bl = br = 0.
+        dbl = dbr = 0.
+        dxl, dxr = dxi[[0,-1]]
     elif boundary == 'periodic':
-        yl, yr = y[[-1,0]]
-    elif boundary == 'constant':
-        yl, yr = y[[0,-1]]
-    else:
-        yl, yr = boundary
+        bl, br = y[[-1,0]]
+        dbl, dbr = y[[-1,1]] - y[[-2,0]]
+        dxl, dxr = dxi[[-1,0]]
+    else: # mirror
+        bl, br = y[[0,-1]]
+        dbl, dbr = y[[1,-1]] - y[[0,-2]]
+        dxl, dxr = dxi[[0, -1]]
 
-    ql, qr = ai * np.append(yl, y), ai * np.append(y, yr)
+    dx = (np.append(dxl, dxi) + np.append(dxi, dxr)) / 2
+    ql, qr = ai * np.append(bl, y), ai * np.append(y, br)
     dq = qr - ql
 
-    ri = np.where(vi > 0, np.roll(dq, 1) * dq / (dq ** 2 + 1e-16), np.roll(dq, -1) * dq / (dq ** 2 + 1e-16))
-    Fi = vi * np.where(vi > 0, ql, qr) + 0.5 * np.abs(vi) * (1 - np.abs(vi * dt / dx)) * superbee(ri) * dq
-
+    dq_ = np.where(vi >= 0, np.append(dbl, dq[:-1]), np.append(dq[1:], dbr))
+    Fi = (vi * np.where(vi > 0, ql, qr) +
+          0.5 * np.abs(vi) * (1 - np.abs(vi * dt / dx)) * superbee(dq, dq_))
     dF_dx = (Fi[1:] - Fi[:-1]) / dxi
     return y - dF_dx / a * dt
 
@@ -54,8 +64,7 @@ def diffuse(y, d, dt, dx=1, xi=None, ai=None):
 
     ql = d * dt * al / a / dxl / dxi / 2 * np.ones_like(y)
     qr = d * dt * ar / a / dxr / dxi / 2 * np.ones_like(y)
-    ql[0] = 0
-    qr[-1] = 0
+    ql[0], qr[-1] = 0, 0
 
     L = - np.roll(ql, -1)
     U = - np.roll(qr, 1)
