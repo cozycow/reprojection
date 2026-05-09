@@ -1,7 +1,20 @@
 import numpy as np
 
 
-def advect(y, vi, dt, dx=1, xi=None, ai=None, boundary='reflect'):
+def apply_boundary(x, boundary, n=2):
+    if boundary == 'mirror':
+        xl = x[:n:-1]
+        xr = x[-n::-1]
+    elif boundary == 'periodic':
+        xl = x[-n:]
+        xr = x[:n]
+    else:
+        xl = np.zeros(n)
+        xr = np.zeros(n)
+    return np.append(xl, np.append(x, xr))
+
+
+def advect(y, vi, dt, dx=1, xi=None, ai=None, boundary='mirror'):
     def minmod(a, b):
         return np.where(a * b > 0, np.where(np.abs(a) < np.abs(b), a, b), 0)
 
@@ -17,30 +30,20 @@ def advect(y, vi, dt, dx=1, xi=None, ai=None, boundary='reflect'):
         dxi = dx * np.ones_like(y)
 
     if ai is None:
-        ai = a = 1
-    else:
-        a = (ai[:-1] + ai[1:]) / 2
+        ai = np.ones_like(vi)
+    a = (ai[:-1] + ai[1:]) / 2
 
-    if boundary == 'reflect':
-        bl = br = 0.
-        dbl = dbr = 0.
-        dxl, dxr = dxi[[0,-1]]
-    elif boundary == 'periodic':
-        bl, br = y[[-1,0]]
-        dbl, dbr = y[[-1,1]] - y[[-2,0]]
-        dxl, dxr = dxi[[-1,0]]
-    else: # mirror
-        bl, br = y[[0,-1]]
-        dbl, dbr = y[[1,-1]] - y[[0,-2]]
-        dxl, dxr = dxi[[0, -1]]
+    y_ = apply_boundary(y, boundary, n=2)
+    dxi_ = apply_boundary(dxi, boundary, n=1)
+    ai_ = apply_boundary(ai, boundary, n=1)
 
-    dx = (np.append(dxl, dxi) + np.append(dxi, dxr)) / 2
-    ql, qr = ai * np.append(bl, y), ai * np.append(y, br)
+    dx = (dxi_[1:] + dxi_[:-1]) / 2
+    ql, qr = ai_ * y_[:-1], ai_ * y_[1:]
     dq = qr - ql
+    dq_ = superbee(np.where(vi >= 0, dq[:-2], dq[2:]), dq[1:-1])
 
-    dq_ = np.where(vi >= 0, np.append(dbl, dq[:-1]), np.append(dq[1:], dbr))
-    Fi = (vi * np.where(vi > 0, ql, qr) +
-          0.5 * np.abs(vi) * (1 - np.abs(vi * dt / dx)) * superbee(dq, dq_))
+    Fi = (vi * np.where(vi > 0, ql[1:-1], qr[1:-1]) +
+          0.5 * np.abs(vi) * (1 - np.abs(vi * dt / dx)) * dq_)
     dF_dx = (Fi[1:] - Fi[:-1]) / dxi
     return y - dF_dx / a * dt
 
