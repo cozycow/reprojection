@@ -14,7 +14,7 @@ def apply_boundary(x, boundary, n=2):
     return np.append(xl, np.append(x, xr))
 
 
-def advect(y, vi, dt, dx=1, xi=None, ai=None, boundary='mirror'):
+def advect(y, vi, dt, dx=1, xi=None, ai=None, boundary='mirror', hires=True):
     def minmod(a, b):
         return np.where(a * b > 0, np.where(np.abs(a) < np.abs(b), a, b), 0)
 
@@ -34,16 +34,17 @@ def advect(y, vi, dt, dx=1, xi=None, ai=None, boundary='mirror'):
     a = (ai[:-1] + ai[1:]) / 2
 
     y_ = apply_boundary(y, boundary, n=2)
-    dxi_ = apply_boundary(dxi, boundary, n=1)
     ai_ = apply_boundary(ai, boundary, n=1)
-
-    dx = (dxi_[1:] + dxi_[:-1]) / 2
     ql, qr = ai_ * y_[:-1], ai_ * y_[1:]
-    dq = qr - ql
-    dq_ = superbee(np.where(vi >= 0, dq[:-2], dq[2:]), dq[1:-1])
 
-    Fi = (vi * np.where(vi > 0, ql[1:-1], qr[1:-1]) +
-          0.5 * np.abs(vi) * (1 - np.abs(vi * dt / dx)) * dq_)
+    Fi = vi * np.where(vi > 0, ql[1:-1], qr[1:-1])
+    if hires:
+        dxi_ = apply_boundary(dxi, boundary, n=1)
+        dx = (dxi_[1:] + dxi_[:-1]) / 2
+        dq = qr - ql
+        dq_ = superbee(np.where(vi >= 0, dq[:-2], dq[2:]), dq[1:-1])
+        Fi += 0.5 * np.abs(vi) * (1 - np.abs(vi * dt / dx)) * dq_
+
     dF_dx = (Fi[1:] - Fi[:-1]) / dxi
     return y - dF_dx / a * dt
 
