@@ -11,7 +11,7 @@ def apply_boundary(x, boundary, n=2):
     else:
         xl = np.zeros(n)
         xr = np.zeros(n)
-    return np.append(xl, np.append(x, xr))
+    return np.append(xl, np.append(x, xr, axis=0), axis=0)
 
 
 def advect(y, vi, dt, dx=1, xi=None, ai=None, boundary='mirror', hires=True):
@@ -25,12 +25,12 @@ def advect(y, vi, dt, dx=1, xi=None, ai=None, boundary='mirror', hires=True):
         return maxmod(minmod(a, 2 * b), minmod(2 * a, b))
 
     if xi is not None:
-        dxi = xi[1:] - xi[:-1]
+        dxi = np.resize(xi[1:] - xi[:-1], y.shape)
     else:
         dxi = dx * np.ones_like(y)
 
     if ai is None:
-        ai = np.ones_like(vi)
+        ai = np.ones((y.shape[0] + 1,) + y.shape[1:])
     a = (ai[:-1] + ai[1:]) / 2
 
     y_ = apply_boundary(y, boundary, n=2)
