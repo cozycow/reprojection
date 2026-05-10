@@ -1,6 +1,18 @@
 import numpy as np
 
 
+def minmod(a, b):
+    return np.where(a * b > 0, np.where(np.abs(a) < np.abs(b), a, b), 0)
+
+
+def maxmod(a, b):
+    return np.where(a * b > 0, np.where(np.abs(a) > np.abs(b), a, b), 0)
+
+
+def superbee(a, b):
+    return maxmod(minmod(a, 2 * b), minmod(2 * a, b))
+
+
 def apply_boundary(x, boundary, n=2):
     if boundary == 'mirror':
         xl = x[:n][::-1]
@@ -11,26 +23,18 @@ def apply_boundary(x, boundary, n=2):
     else:
         xl = np.zeros(n)
         xr = np.zeros(n)
-    return np.append(xl, np.append(x, xr, axis=0), axis=0)
+    return np.append(xl, np.append(x, xr))
 
 
-def advect(y, vi, dt, dx=1, xi=None, ai=None, boundary='mirror', hires=True):
-    def minmod(a, b):
-        return np.where(a * b > 0, np.where(np.abs(a) < np.abs(b), a, b), 0)
-
-    def maxmod(a, b):
-        return np.where(a * b > 0, np.where(np.abs(a) > np.abs(b), a, b), 0)
-
-    def superbee(a, b):
-        return maxmod(minmod(a, 2 * b), minmod(2 * a, b))
+def advect(y, vi, dt, dxi=1, xi=None, ai=None, boundary='mirror', hires=True):
 
     if xi is not None:
-        dxi = np.resize(xi[1:] - xi[:-1], y.shape)
+        dxi = xi[1:] - xi[:-1]
     else:
-        dxi = dx * np.ones_like(y)
+        dxi = dxi * np.ones_like(y)
 
     if ai is None:
-        ai = np.ones((y.shape[0] + 1,) + y.shape[1:])
+        ai = np.ones(len(y) + 1)
     a = (ai[:-1] + ai[1:]) / 2
 
     y_ = apply_boundary(y, boundary, n=2)
@@ -49,12 +53,13 @@ def advect(y, vi, dt, dx=1, xi=None, ai=None, boundary='mirror', hires=True):
     return y - dF_dx / a * dt
 
 
-def diffuse(y, d, dt, dx=1, xi=None, ai=None, boundary='mirror'):
+def diffuse(y, d, dt, dxi=1, xi=None, ai=None):
     from scipy.linalg import solve_banded
+
     if xi is not None:
         dxi = xi[1:] - xi[:-1]
     else:
-        dxi = dx * np.ones_like(y)
+        dxi = dxi * np.ones_like(y)
 
     if ai is None:
         ai = np.ones(len(y) + 1)
@@ -77,10 +82,10 @@ def diffuse(y, d, dt, dx=1, xi=None, ai=None, boundary='mirror'):
     return solve_banded((1, 1), [U, A, L], B, True, True)
 
 
-def diffuse_fft(y, d, dt, dx=1):
+def diffuse_fft(y, d, dt, dxi=1):
     from numpy.fft import fft, ifft, fftfreq
     f = fftfreq(len(y))
-    q = d * dt / dx ** 2
+    q = d * dt / dxi ** 2
     p = q * (1 - np.cos(2 * np.pi * f))
     a = fft(y) * (1 - p) / (1 + p)
     return np.real(ifft(a))
