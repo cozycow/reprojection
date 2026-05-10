@@ -3,8 +3,8 @@ import numpy as np
 
 def apply_boundary(x, boundary, n=2):
     if boundary == 'mirror':
-        xl = x[:n:-1]
-        xr = x[-n::-1]
+        xl = x[:n][::-1]
+        xr = x[-n:][::-1]
     elif boundary == 'periodic':
         xl = x[-n:]
         xr = x[:n]
@@ -49,25 +49,25 @@ def advect(y, vi, dt, dx=1, xi=None, ai=None, boundary='mirror', hires=True):
     return y - dF_dx / a * dt
 
 
-def diffuse(y, d, dt, dx=1, xi=None, ai=None):
+def diffuse(y, d, dt, dx=1, xi=None, ai=None, boundary='mirror'):
     from scipy.linalg import solve_banded
     if xi is not None:
-        x = (xi[1:] + xi[:-1]) / 2
-        dxl = x - np.roll(x, 1)
-        dxr = np.roll(x, -1) - x
         dxi = xi[1:] - xi[:-1]
     else:
-        dxi = dxl = dxr = dx
+        dxi = dx * np.ones_like(y)
 
     if ai is None:
-        a = al = ar = 1
-    else:
-        al = ai[:-1]
-        ar = ai[1:]
-        a = (al + ar) / 2
+        ai = np.ones(len(y) + 1)
 
-    ql = d * dt * al / a / dxl / dxi / 2 * np.ones_like(y)
-    qr = d * dt * ar / a / dxr / dxi / 2 * np.ones_like(y)
+    al = ai[:-1]
+    ar = ai[1:]
+    a = (al + ar) / 2
+
+    dxl = (dxi + np.roll(dxi, 1)) / 2
+    dxr = (dxi + np.roll(dxi, -1)) / 2
+
+    ql = d * dt * al / a / dxi / dxl / 2
+    qr = d * dt * ar / a / dxi / dxr / 2
     ql[0], qr[-1] = 0, 0
 
     L = - np.roll(ql, -1)
