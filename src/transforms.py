@@ -273,8 +273,8 @@ class ToSynoptic(Transform):
             q = 1 / q
 
         dphi = phi - self.crln
+        dphi = (dphi - 180) % 360 - 180
         #dphi[np.abs(dphi) > 22.5] = np.nan
-        dphi[np.abs(dphi) > 180] = np.nan
         phi = self.crln + dphi * q
 
         return (theta, phi), alpha
