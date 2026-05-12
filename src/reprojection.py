@@ -9,8 +9,6 @@ AU = 149597870691.
 CLIGHT = 299792458
 RSUN = 696000000.
 A, B, C = 14.712, -2.396, -1.787  # differential rotation rates (Snodgrass & Ulrich, ApJ, 351, 309, 1990)
-#P_CBS = [-893, 4134, -7347, 6963, -3352, 223]  # convective blue shift coefficients for HMI (Stief et al., A&A, 622, A34, 2019)
-P_CBS = [-768, 2073, -1785, 462] # FDT fit
 
 
 def func_mu(r, rsun_arc=0.):
