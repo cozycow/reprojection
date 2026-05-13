@@ -7,7 +7,7 @@ WSID = 360 / 25.38
 WSYN = 360 / 27.2753
 AU = 149597870691.
 CLIGHT = 299792458
-RSUN = 696000000.
+RSUN = 696e8
 A, B, C = 14.712, -2.396, -1.787  # differential rotation rates (Snodgrass & Ulrich, ApJ, 351, 309, 1990)
 
 
@@ -209,7 +209,7 @@ class View:
 
     def velocity(self, **kwargs):
         xi, yi, zi = self.grid(origin='carrington', **kwargs)
-        U = (A + B * yi ** 2 + C * yi ** 4) * RSUN * np.pi / 180 / 24 / 3600
+        U = (A + B * yi ** 2 + C * yi ** 4) * RSUN / 100 * np.pi / 180 / 24 / 3600
 
         transform = self.to_heliographic(origin='carrington', **kwargs)
         v, _ = transform((zi * U, 0, -xi * U))
