@@ -108,8 +108,9 @@ class Normalize(Transform):
 
 class Make3d(Transform):
 
-    def __init__(self, theta, inv=False):
+    def __init__(self, theta, mu_thr=0, inv=False):
         self.theta = theta
+        self.mu_thr = mu_thr
         self.inv = inv
 
     def __repr__(self):
@@ -128,26 +129,27 @@ class Make3d(Transform):
             x, y = r
             z2 = 1 - x ** 2 - y ** 2
             if isinstance(z2, np.ndarray):
-                t = np.where(z2 < 0)
+                t = np.where(z2 < self.mu_thr ** 2)
                 x[t], y[t], z2[t] = np.nan, np.nan, np.nan
             else:
-                if z2 < 0:
+                if z2 < self.mu_thr ** 2:
                     x, y = np.nan, np.nan
-            return self.__paraxial((y, x, np.sqrt(z2))), alpha
+            z = np.sqrt(z2)
+            return self.__paraxial((y, x, z)), alpha * z
         else:
             x, y, z = self.__paraxial(r)
 
             if isinstance(z, np.ndarray):
-                t = np.where(z < 0)
+                t = np.where(z < self.mu_thr)
                 x[t], y[t] = np.nan, np.nan
             else:
-                if z < 0:
+                if z < self.mu_thr:
                     x, y = np.nan, np.nan
 
-            return (y, x), alpha
+            return (y, x), alpha / z
 
     def __invert__(self):
-        return type(self)(-self.theta, not self.inv)
+        return type(self)(-self.theta, self.mu_thr, not self.inv)
 
 
 class Rotate(Transform):
@@ -249,13 +251,14 @@ class ToSynoptic(Transform):
         else:
             return super().__new__(cls)
 
-    def __init__(self, crln, A, B, C, Wsid, Wsyn, inv=False):
+    def __init__(self, crln, A, B, C, Wsid, Wsyn, delta_lon=180, inv=False):
         self.crln = crln
         self.A = A
         self.B = B
         self.C = C
         self.Wsid = Wsid
         self.Wsyn = Wsyn
+        self.delta_lon = delta_lon
         self.inv = inv
 
     def __repr__(self):
@@ -273,14 +276,13 @@ class ToSynoptic(Transform):
             q = 1 / q
 
         dphi = phi - self.crln
-        #dphi = (dphi - 180) % 360 - 180
-        dphi[np.abs(dphi) > 22.5] = np.nan
+        dphi[np.abs(dphi) > self.delta_lon] = np.nan
         phi = self.crln + dphi * q
 
         return (theta, phi), alpha
 
     def __invert__(self):
-        return type(self)(self.crln, A=self.A, B=self.B, C=self.C, Wsid=self.Wsid, Wsyn=self.Wsyn, inv=not self.inv)
+        return type(self)(self.crln, A=self.A, B=self.B, C=self.C, Wsid=self.Wsid, Wsyn=self.Wsyn, delta_lon=self.delta_lon, inv=not self.inv)
 
 
 class Filter(Transform):

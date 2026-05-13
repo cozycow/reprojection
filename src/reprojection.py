@@ -11,14 +11,6 @@ RSUN = 696e8
 A, B, C = 14.712, -2.396, -1.787  # differential rotation rates (Snodgrass & Ulrich, ApJ, 351, 309, 1990)
 
 
-def func_mu(r, rsun_arc=0.):
-    q = np.tan(rsun_arc / 3600 * np.pi / 180)
-    return (r[2] - q) / np.sqrt(1 - 2 * r[2] * q + q ** 2)
-
-def clip_mu(r, rsun_arc=0., thr=0.):
-    return np.where(func_mu(r, rsun_arc=rsun_arc) > thr, 1, np.nan)
-
-
 class View:
     def __init__(self, nx, ny, xc, yc, rsun, crota, crlt, crln, hgln=0.,
                  vr=0., vw=0., vn=0., rsun_arc=0., dsun=AU):
@@ -138,16 +130,12 @@ class View:
     def get_transform(self, name='image', **kwargs):
         return getattr(self, 'to_' + name, Pipe)(**kwargs)
 
-    def to_heliographic(self, correct_mu=False, mu_thr=0, origin='image', **kwargs):
+    def to_heliographic(self, mu_thr=0, origin='image', **kwargs):
         transform = (~self.get_transform(origin, **kwargs) +
                      Normalize((self.xc, self.yc), self.rsun) +
-                     Make3d(self.rsun_arc / 3600))
+                     Make3d(self.rsun_arc / 3600, mu_thr=mu_thr))
 
-        if correct_mu:
-            transform += Filter(func_mu, rsun_arc=self.rsun_arc)
-
-        transform += (Filter(clip_mu, rsun_arc=self.rsun_arc, thr=mu_thr) +
-                      Rotate.z(self.crota * np.pi / 180))
+        transform += Rotate.z(self.crota * np.pi / 180)
         return transform
 
     def to_carrington(self, origin='image', **kwargs):
@@ -160,7 +148,7 @@ class View:
                      Rotate.y(crln * np.pi / 180))
         return transform
 
-    def to_synoptic(self, stonyhurst=False, origin='image', **kwargs):
+    def to_synoptic(self, stonyhurst=False, origin='image', delta_lon=180, **kwargs):
         tdel = (AU - self.dsun) / CLIGHT
         crln = self.crln + tdel * WSID / 24 / 3600
 
@@ -174,7 +162,7 @@ class View:
         transform = (~self.get_transform(origin, **kwargs) +
                      self.to_carrington(**kwargs) +
                      ToSpherical() +
-                     ToSynoptic(crln0, Wsid=WSID, Wsyn=wsyn, A=A, B=B, C=C) -
+                     ToSynoptic(crln0, Wsid=WSID, Wsyn=wsyn, A=A, B=B, C=C, delta_lon=delta_lon) -
                      ToSpherical())
         return transform
 
@@ -184,7 +172,7 @@ class View:
         grid, _ = transform(grid)
         return grid
 
-    def reproject(self, image, view, grid=None, distort=None, **kwargs):
+    def reproject(self, image, view, grid=None, distort=None, correct_mu=False, **kwargs):
         transform = self.to_carrington(**kwargs) - view.to_carrington(**kwargs)
         if grid is None:
             grid = self.grid(**kwargs)
@@ -197,10 +185,13 @@ class View:
             yi = interp2d(yd, *grid_, kind='bilinear')
             grid_ = (xi, yi)
 
-        return interp2d(image, *grid_, **kwargs) * alpha
+        image_ = interp2d(image, *grid_, **kwargs)
+        if correct_mu:
+            image_ *= alpha
+        return image_
 
     def mu(self, *args, **kwargs):
-        transform = self.to_heliographic(correct_mu=True, **kwargs)
+        transform = self.to_heliographic(**kwargs)
         if len(args) > 0:
             _, alpha = transform(args)
         else:
