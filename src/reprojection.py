@@ -252,7 +252,7 @@ def remap(data, header, dlon=1, dlat=1, **kwargs):
     '''
 
     view = View.from_header(header).update(**kwargs)
-    transform = ~ToSpherical()  - view.to_carrington(**kwargs)
+    transform = ~ToSpherical() - view.to_carrington(**kwargs)
 
     grid = np.mgrid[-90:90 + dlat / 2:dlat, -180:180:dlon]
     grid, alpha = transform(grid)
