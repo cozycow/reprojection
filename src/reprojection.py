@@ -67,16 +67,19 @@ def polar_view(data, header, pole='north', return_alpha=False, qr=0.45, mu_thr=0
         return data_
 
 
-def make_map(files, pow=4, polar=False, **kwargs):
+def make_map(files, pow=4, polar=False, binning=1, **kwargs):
     '''
     Creates an averaged map by applying 'remap' routine to every dataset in files
     '''
+    from utils import rebin
 
     mean, coverage = 0, 0
     for file in files:
         with fits.open(file) as hdul:
             header = hdul[0].header.copy()
             data = hdul[0].data.copy()
+
+        data = rebin(data, binning, update_header=header)
 
         if polar:
             data, alpha = polar_view(data, header, return_alpha=True, **kwargs)
