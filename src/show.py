@@ -3,7 +3,8 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 import sunpy.visualization.colormaps as cm
 from matplotlib import colormaps
-from reprojection import *
+from transforms import ToSpherical
+from view import View
 
 
 def show_data(data, view, title='', label='', figsize=(10,10), cmap='hmimag', vmin=-200, vmax=200,

@@ -1,7 +1,6 @@
 import numpy as np
 from astropy.io import fits
 from view import View
-from transforms import *
 from interpolation import interp2d
 
 
@@ -24,6 +23,8 @@ def remap(data, header, dlon=1, dlat=1, sine_lat=False, return_alpha=False, **kw
     '''
     Remaps the data obtained from a view defined by 'header' to spherical (Carrington) coordinates.
     '''
+
+    from transforms import ToSpherical
 
     view = View.from_header(header).update(**kwargs)
     transform = ~ToSpherical() - view.to_carrington(correct_mu=True, **kwargs)
