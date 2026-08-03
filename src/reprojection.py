@@ -1,4 +1,5 @@
 import numpy as np
+from astropy.io import fits
 from interpolation import interp2d
 from transforms import *
 
@@ -16,18 +17,6 @@ class View:
                  vr=0., vw=0., vn=0., rsun_arc=0., dsun=AU):
         '''
         A WCS information container.
-
-        :param nx:
-        :param ny:
-        :param xc:
-        :param yc:
-        :param rsun:
-        :param crota:
-        :param crlt:
-        :param crln:
-        :param x0:
-        :param y0:
-        :param ww:
         '''
 
         self.nx = nx
@@ -174,14 +163,6 @@ class View:
 def reproject(data, header, header_new=None, **kwargs):
     '''
     Reprojects the data obtained from a view defined by 'header' to a view defined by 'header_new'.
-
-    :param data:
-    :param header:
-    :param header_new:
-    :param correct_mu:
-    :param mu_thr:
-    :param kwargs:
-    :return:
     '''
 
     if header_new is None:
@@ -197,22 +178,39 @@ def reproject(data, header, header_new=None, **kwargs):
 def remap(data, header, dlon=1, dlat=1, **kwargs):
     '''
     Remaps the data obtained from a view defined by 'header' to spherical (Carrington) coordinates.
-
-    :param data:
-    :param header:
-    :param dlon:
-    :param dlat:
-    :param correct_mu:
-    :param mu_thr:
-    :param kwargs:
-    :return:
     '''
 
     view = View.from_header(header).update(**kwargs)
     transform = ~ToSpherical() - view.to_carrington(**kwargs)
 
-    grid = np.mgrid[-90:90 + dlat / 2:dlat, -180:180:dlon]
+    grid = np.mgrid[-90:90 + dlat / 2:dlat, :360:dlon]
     grid, alpha = transform(grid)
-    data = interp2d(data, *grid, **kwargs) * alpha
-    return data
+    return interp2d(data, *grid, **kwargs) * alpha
 
+
+def make_map(files, dlon=1, dlat=1, pow=4, **kwargs):
+    '''
+    Creates an averaged map
+    '''
+
+    grid = np.mgrid[-90:90 + dlat / 2:dlat, :360:dlon]
+    mean, coverage = 0, 0
+
+    for file in files:
+        with fits.open(file) as hdul:
+            header = hdul[0].header.copy()
+            data = hdul[0].data.copy()
+
+        view = View.from_header(header).update(**kwargs)
+        transform = ~ToSpherical() - view.to_carrington(**kwargs)
+
+        grid_, alpha = transform(grid)
+        map = interp2d(data, *grid_, **kwargs) * alpha
+        weight = (~np.isnan(map)) * alpha ** (-pow)
+
+        coverage += np.nan_to_num(weight)
+        mean += np.nan_to_num((map - mean) * weight / coverage)
+
+    mean[coverage == 0] = np.nan
+    coverage[coverage == 0] = np.nan
+    return mean, coverage
