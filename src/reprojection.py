@@ -175,7 +175,7 @@ def reproject(data, header, header_new=None, **kwargs):
     return view_new.reproject(data, view, **kwargs)
 
 
-def remap(data, header, dlon=1, dlat=1, return_alpha=False, **kwargs):
+def remap(data, header, dlon=1, dlat=1, sine_lat=False, return_alpha=False, **kwargs):
     '''
     Remaps the data obtained from a view defined by 'header' to spherical (Carrington) coordinates.
     '''
@@ -183,7 +183,12 @@ def remap(data, header, dlon=1, dlat=1, return_alpha=False, **kwargs):
     view = View.from_header(header).update(**kwargs)
     transform = ~ToSpherical() - view.to_carrington(**kwargs)
 
-    grid = np.mgrid[-90:90 + dlat / 2:dlat, :360:dlon]
+    if sine_lat:
+        grid = np.mgrid[-1:1 + dlat / 2:dlat, :360:dlon]
+        grid[0] = np.arcsin(grid[0].clip(-1,1)) * 180 / np.pi
+    else:
+        grid = np.mgrid[-90:90 + dlat / 2:dlat, :360:dlon]
+
     grid, alpha = transform(grid)
     data_ = interp2d(data, *grid, **kwargs) * alpha
     if return_alpha:
