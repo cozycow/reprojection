@@ -138,7 +138,7 @@ class View:
         transform += Rotate.z(self.crota * np.pi / 180)
         return transform
 
-    def to_carrington(self, origin='image', correct_dr=False,  **kwargs):
+    def to_carrington(self, origin='image', **kwargs):
         tdel = (AU - self.dsun) / CLIGHT
         crln = self.crln + tdel * WSID / 24 / 3600
 
@@ -146,12 +146,24 @@ class View:
                      self.to_heliographic(**kwargs) -
                      Rotate.x(self.crlt * np.pi / 180) +
                      Rotate.y(crln * np.pi / 180))
+        return transform
 
-        if correct_dr:
+    def to_synoptic(self, stonyhurst=False, origin='image', delta_lon=180, **kwargs):
+        tdel = (AU - self.dsun) / CLIGHT
+        crln = self.crln + tdel * WSID / 24 / 3600
+
+        if stonyhurst:
+            crln0 = crln - self.hgln
+            wsyn = WSYN
+        else:
+            crln0 = crln
             wsyn = WSID - self.vw / self.dsun / np.cos(self.crlt * np.pi / 180) / np.pi * 180 * 24 * 60 * 60
-            transform += (ToSpherical() +
-                         ToSynoptic(crln, Wsid=WSID, Wsyn=wsyn, A=A, B=B, C=C, delta_lon=180) -
-                         ToSpherical())
+
+        transform = (~self.get_transform(origin, **kwargs) +
+                     self.to_carrington(**kwargs) +
+                     ToSpherical() +
+                     ToSynoptic(crln0, Wsid=WSID, Wsyn=wsyn, A=A, B=B, C=C, delta_lon=delta_lon) -
+                     ToSpherical())
         return transform
 
     def grid(self, origin='image', **kwargs):
@@ -160,15 +172,45 @@ class View:
         grid, _ = transform(grid)
         return grid
 
-    def reproject(self, image, view, correct_mu=False, **kwargs):
+    def reproject(self, image, view, grid=None, distort=None, correct_mu=False, **kwargs):
         transform = self.to_carrington(**kwargs) - view.to_carrington(**kwargs)
-        grid = self.grid(**kwargs)
+        if grid is None:
+            grid = self.grid(**kwargs)
+
         grid_, alpha = transform(grid)
+
+        if distort is not None:
+            xd, yd = distort
+            xi = interp2d(xd, *grid_, kind='bilinear')
+            yi = interp2d(yd, *grid_, kind='bilinear')
+            grid_ = (xi, yi)
 
         image_ = interp2d(image, *grid_, **kwargs)
         if correct_mu:
             image_ *= alpha
         return image_
+
+    def mu(self, *args, **kwargs):
+        transform = self.to_heliographic(**kwargs)
+        if len(args) > 0:
+            _, alpha = transform(args)
+        else:
+            _, alpha = transform(self.grid(**kwargs))
+        return alpha
+
+    def velocity(self, **kwargs):
+        xi, yi, zi = self.grid(origin='carrington', **kwargs)
+        U = (A + B * yi ** 2 + C * yi ** 4) * RSUN / 100 * np.pi / 180 / 24 / 3600
+
+        transform = self.to_heliographic(origin='carrington', **kwargs)
+        v, _ = transform((zi * U, 0, -xi * U))
+        vx, vy, vz = v[0] - self.vw, v[1] - self.vn, v[2] - self.vr
+        xi, yi, zi = self.grid(origin='heliographic', **kwargs)
+
+        q = np.tan(self.rsun_arc * np.pi / 180 / 3600)
+        d = np.sqrt(1 - 2 * zi * q + q ** 2)
+        V = (q * (xi * vx + yi * vy + zi * vz) - vz) / d
+        return V
 
 
 def reproject(data, header, header_new=None, **kwargs):
@@ -183,6 +225,7 @@ def reproject(data, header, header_new=None, **kwargs):
     :param kwargs:
     :return:
     '''
+
 
     if header_new is None:
         header_ = header
