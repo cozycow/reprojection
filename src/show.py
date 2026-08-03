@@ -56,3 +56,29 @@ def show_data(data, view, title='', label='', figsize=(10,10), cmap=hmimag, vmin
         plt.savefig(to_file)
         plt.ion()
         plt.close(fig)
+
+
+def show_map(data, figsize=(15,8), label=r'$B_{r}$, G', cmap='seismic', vmin=-50, vmax=50, sine_lat=False, **kwargs):
+    if sine_lat:
+        extent = (0, 360, -1, 1)
+    else:
+        extent = (0, 360, -90, 90)
+
+    fig, ax = plt.subplots(figsize=figsize)
+    im = ax.imshow(data, origin='lower', cmap=cmap, vmin=vmin, vmax=vmax,
+                   extent=extent, aspect='auto', **kwargs)
+
+    ax.set_xticks(np.arange(0,361,30), np.arange(0,361,30))
+    if sine_lat:
+        ax.set_yticks(np.sin(np.arange(-90, 91, 15) * np.pi / 180), np.arange(-90, 91, 15))
+    else:
+        ax.set_yticks(np.arange(-90, 91, 15), np.arange(-90, 91, 15))
+
+    ax.set_xlabel('Longitude, degrees')
+    ax.set_ylabel('Latitude, degrees')
+
+    cax = ax.inset_axes((0.03, 0.1, 0.1, 0.015))
+    fig.colorbar(im, cax=cax, orientation='horizontal', label=label)
+
+    ax.grid(True, ls='--', color='black', alpha=0.2)
+    plt.tight_layout()
