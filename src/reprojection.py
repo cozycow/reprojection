@@ -19,7 +19,7 @@ def reproject(data, header, header_new=None, **kwargs):
     return view_new.reproject(data, view, **kwargs)
 
 
-def remap(data, header, dlon=1, dlat=1, sine_lat=False, return_alpha=False, **kwargs):
+def remap(data, header, dlon=0.2, dlat=0.2, sine_lat=False, return_alpha=False, mu_thr=0.1, **kwargs):
     '''
     Remaps the data obtained from a view defined by 'header' to spherical (Carrington) coordinates.
     '''
@@ -27,7 +27,7 @@ def remap(data, header, dlon=1, dlat=1, sine_lat=False, return_alpha=False, **kw
     from transforms import ToSpherical
 
     view = View.from_header(header).update(**kwargs)
-    transform = ~ToSpherical() - view.to_carrington(correct_mu=True, **kwargs)
+    transform = ~ToSpherical() - view.to_carrington(correct_mu=True, mu_thr=mu_thr, **kwargs)
 
     if sine_lat:
         grid = np.mgrid[-1:1 + dlat / 2:dlat, :360:dlon]
@@ -43,7 +43,7 @@ def remap(data, header, dlon=1, dlat=1, sine_lat=False, return_alpha=False, **kw
         return data_
 
 
-def polar_view(data, header, pole='north', return_alpha=False, qr=0.45, **kwargs):
+def polar_view(data, header, pole='north', return_alpha=False, qr=0.45, mu_thr=0.1, **kwargs):
     nx, ny = 1024, 1024
     xc, yc = (nx - 1) / 2, (ny - 1) / 2
     Rsun = qr * nx
@@ -57,7 +57,7 @@ def polar_view(data, header, pole='north', return_alpha=False, qr=0.45, **kwargs
     view = View.from_header(header)
 
     transform = (view_new.to_carrington(correct_mu=True) -
-                 view.to_carrington(correct_mu=True, **kwargs))
+                 view.to_carrington(correct_mu=True, mu_thr=mu_thr, **kwargs))
 
     grid, alpha = transform(grid)
     data_ = interp2d(data, *grid, **kwargs) * alpha
