@@ -4,10 +4,9 @@ from matplotlib.patches import Circle
 import sunpy.visualization.colormaps as cm
 from matplotlib import colormaps
 from reprojection import *
-hmimag = colormaps['hmimag']
 
 
-def show_data(data, view, title='', label='', figsize=(10,10), cmap=hmimag, vmin=-200, vmax=200,
+def show_data(data, view, title='', label='', figsize=(10,10), cmap='hmimag', vmin=-200, vmax=200,
               grid_alpha=0.5, grid_color='black', text_alpha=1, text_color='black',
               to_file=None):
 
@@ -58,7 +57,7 @@ def show_data(data, view, title='', label='', figsize=(10,10), cmap=hmimag, vmin
         plt.close(fig)
 
 
-def show_map(data, figsize=(15,8), label=r'$B_{r}$, G', cmap='seismic', vmin=-50, vmax=50, sine_lat=False, **kwargs):
+def show_map(data, figsize=(15,8), label=r'$B_{r}$, G', cmap='hmimag', vmin=-50, vmax=50, sine_lat=False, **kwargs):
     if sine_lat:
         extent = (0, 360, -1, 1)
     else:
