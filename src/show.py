@@ -57,6 +57,19 @@ def show_data(data, view, title='', label='', figsize=(10,10), cmap='hmimag', vm
         plt.close(fig)
 
 
+def show_polar_view(data, pole='north', qr=0.45, label=r'$B_{r}$, G', **kwargs):
+    nx, ny = data.shape
+    xc, yc = (nx - 1) / 2, (ny - 1) / 2
+    Rsun = qr * nx
+
+    if pole == 'north':
+        view = View(nx, ny, xc, yc, Rsun, -90, 90, 0) ### North pole view
+    else:
+        view = View(nx, ny, xc, yc, Rsun, 90, -90, 0) ### South pole view
+
+    return show_data(data, view, label=label, **kwargs)
+
+
 def show_map(data, figsize=(15,8), label=r'$B_{r}$, G', cmap='hmimag', vmin=-50, vmax=50, sine_lat=False, **kwargs):
     if sine_lat:
         extent = (0, 360, -1, 1)
