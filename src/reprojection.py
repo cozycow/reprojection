@@ -175,7 +175,7 @@ def reproject(data, header, header_new=None, **kwargs):
     return view_new.reproject(data, view, **kwargs)
 
 
-def remap(data, header, dlon=1, dlat=1, **kwargs):
+def remap(data, header, dlon=1, dlat=1, return_alpha=False, **kwargs):
     '''
     Remaps the data obtained from a view defined by 'header' to spherical (Carrington) coordinates.
     '''
@@ -185,31 +185,29 @@ def remap(data, header, dlon=1, dlat=1, **kwargs):
 
     grid = np.mgrid[-90:90 + dlat / 2:dlat, :360:dlon]
     grid, alpha = transform(grid)
-    return interp2d(data, *grid, **kwargs) * alpha
+    data_ = interp2d(data, *grid, **kwargs) * alpha
+    if return_alpha:
+        return data_, alpha
+    else:
+        return data_
 
 
-def make_map(files, dlon=1, dlat=1, pow=4, **kwargs):
+def make_map(files, pow=4, **kwargs):
     '''
-    Creates an averaged map
+    Creates an averaged map by applying 'remap' routine to every dataset in files
     '''
 
-    grid = np.mgrid[-90:90 + dlat / 2:dlat, :360:dlon]
     mean, coverage = 0, 0
-
     for file in files:
         with fits.open(file) as hdul:
             header = hdul[0].header.copy()
             data = hdul[0].data.copy()
 
-        view = View.from_header(header).update(**kwargs)
-        transform = ~ToSpherical() - view.to_carrington(**kwargs)
-
-        grid_, alpha = transform(grid)
-        map = interp2d(data, *grid_, **kwargs) * alpha
-        weight = (~np.isnan(map)) * alpha ** (-pow)
+        data, alpha = remap(data, header, return_alpha=True, **kwargs)
+        weight = (~np.isnan(data)) * alpha ** (-pow)
 
         coverage += np.nan_to_num(weight)
-        mean += np.nan_to_num((map - mean) * weight / coverage)
+        mean += np.nan_to_num((data - mean) * weight / coverage)
 
     mean[coverage == 0] = np.nan
     coverage[coverage == 0] = np.nan
