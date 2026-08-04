@@ -95,3 +95,35 @@ def show_map(data, figsize=(15,8), label=r'$B_{r}$, G', cmap='hmimag', vmin=-50,
 
     ax.grid(True, ls='--', color='black', alpha=0.2)
     plt.tight_layout()
+
+
+def plot_flux(*args, sine_lat=False, staggered_lat=False):
+    plt.figure(figsize=(10,8))
+
+    for flux in args:
+        nx = len(flux)
+
+        if sine_lat:
+            spread = 2
+        else:
+            spread = 180
+
+        if staggered_lat:
+            dlat = spread / nx
+            lati = np.arange(-spread / 2,spread / 2 + dlat / 2, dlat)
+            lat = (lati[1:] + lati[:-1]) / 2
+        else:
+            dlat = spread / (nx - 1)
+            lat = np.arange(-spread / 2,spread / 2 + dlat / 2, dlat)
+
+        if sine_lat:
+            lat = np.arcsin(lat.clip(-1,1)) * 180 / np.pi
+
+        plt.plot(lat, flux)
+
+    plt.xlim(-90,90)
+    plt.ylim(-10,10)
+
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
