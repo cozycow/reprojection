@@ -1,8 +1,7 @@
 import numpy as np
 from astropy.io import fits
 from view import View
-from interpolation import interp2d
-
+from scipy.ndimage import map_coordinates
 
 def reproject(data, header, header_new=None, **kwargs):
     '''
@@ -19,7 +18,7 @@ def reproject(data, header, header_new=None, **kwargs):
     return view_new.reproject(data, view, **kwargs)
 
 
-def remap(data, header, nx=720, ny=1800, sine_lat=False, return_alpha=False, mu_thr=0.1, **kwargs):
+def remap(data, header, nx=720, ny=1800, sine_lat=False, staggered_lat=False, return_alpha=False, mu_thr=0.1, **kwargs):
     '''
     Remaps the data obtained from a view defined by 'header' to spherical (Carrington) coordinates.
     '''
@@ -36,14 +35,21 @@ def remap(data, header, nx=720, ny=1800, sine_lat=False, return_alpha=False, mu_
     else:
         lat_spread = 180
 
-    dlat = lat_spread / (nx - 1)
+    if staggered_lat:
+        dlat = lat_spread / nx
+    else:
+        dlat = lat_spread / (nx - 1)
+
     grid = np.mgrid[-lat_spread / 2:lat_spread / 2 + dlat / 2:dlat, :360:dlon]
+
+    if staggered_lat:
+        grid = np.array([(grid[0][1:] + grid[0][:-1]) / 2, grid[1][1:]])
 
     if sine_lat:
         grid[0] = np.arcsin(grid[0].clip(-1,1)) * 180 / np.pi
 
     grid, alpha = transform(grid)
-    data_ = interp2d(data, *grid, **kwargs) * alpha
+    data_ = map_coordinates(data, grid, cval=np.nan) * alpha
     if return_alpha:
         return data_, alpha
     else:
@@ -67,7 +73,7 @@ def polar_view(data, header, pole='north', return_alpha=False, qr=0.45, mu_thr=0
                  view.to_carrington(correct_mu=True, mu_thr=mu_thr, **kwargs))
 
     grid, alpha = transform(grid)
-    data_ = interp2d(data, *grid, **kwargs) * alpha
+    data_ = map_coordinates(data, grid, cval=np.nan) * alpha
     if return_alpha:
         return data_, alpha
     else:

@@ -1,5 +1,5 @@
 import numpy as np
-from interpolation import interp2d
+from scipy.ndimage import map_coordinates
 from transforms import *
 
 
@@ -153,7 +153,8 @@ class View:
         grid = self.grid(**kwargs)
         grid_, alpha = transform(grid)
 
-        image_ = interp2d(image, *grid_, **kwargs)
+        #image_ = interp2d(image, *grid_, **kwargs)
+        image_ = map_coordinates(image, grid_, cval=np.nan)
         if correct_mu:
             image_ *= alpha
         return image_

@@ -47,12 +47,6 @@ def crop_grid(xi, yi, header):
     return xi[x0:x0 + nx, y0:y0 + ny] - x0, yi[x0:x0 + nx, y0:y0 + ny] - y0
 
 
-def undistort(image, header, xd, yd, **kwargs):
-    from interpolation import interp2d
-    xd_, yd_ = crop_grid(xd, yd, header)
-    return interp2d(image, xd_, yd_, **kwargs)
-
-
 def remove_straylight(data, alpha=2., beta=1.5, epsilon=0.25, size=511, niter=3):
     from scipy.signal import fftconvolve
     nx, ny = data.shape[-2:]
