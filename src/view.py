@@ -153,8 +153,7 @@ class View:
         grid = self.grid(**kwargs)
         grid_, alpha = transform(grid)
 
-        #image_ = interp2d(image, *grid_, **kwargs)
-        image_ = map_coordinates(image, grid_, cval=np.nan)
+        image_ = map_coordinates(np.nan_to_num(image), grid_, cval=np.nan)
         if correct_mu:
             image_ *= alpha
         return image_

@@ -12,6 +12,10 @@ def show_data(data, view, title='', label='', figsize=(10,10), cmap='hmimag', vm
               to_file=None):
 
     transform = ~(view.to_carrington(mu_thr=-1e-8) + ToSpherical())
+    _, _, mu = view.grid(origin='heliographic')
+    data_ = data.copy()
+    data_[np.isnan(mu)] = np.nan
+
     grid = np.mgrid[-90:90.5:1,0:360.5:1]
     grid, _ = transform(grid)
     grid = np.array(grid)
@@ -23,7 +27,7 @@ def show_data(data, view, title='', label='', figsize=(10,10), cmap='hmimag', vm
         plt.ioff()
 
     fig, ax = plt.subplots(figsize=figsize)
-    image = ax.imshow(data, origin='lower', cmap=cmap, vmin=vmin, vmax=vmax)
+    image = ax.imshow(data_, origin='lower', cmap=cmap, vmin=vmin, vmax=vmax)
     ax.plot(meridians[1][:,1:-1], meridians[0][:,1:-1], color=grid_color, ls='--', lw=0.5, alpha=grid_alpha)
     ax.plot(meridians[1][:,0], meridians[0][:,0], color=grid_color, ls='-', lw=0.5, alpha=grid_alpha) # central meridian
 
