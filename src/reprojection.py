@@ -19,7 +19,7 @@ def reproject(data, header, header_new=None, **kwargs):
 
 
 def remap(data, header, nx=720, ny=1800, sine_lat=False,
-          staggered_lat=False, return_alpha=False, mu_thr=0.2, correct_mu=False, **kwargs):
+          staggered_lat=False, return_alpha=False, mu_thr=0.2, correct_mu=True, **kwargs):
     '''
     Remaps the data obtained from a view defined by 'header' to spherical (Carrington) coordinates.
     '''
