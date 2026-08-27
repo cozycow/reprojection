@@ -62,7 +62,7 @@ def show_data(data, view, title='', label='', figsize=(10,10), cmap='hmimag', vm
         plt.close(fig)
 
 
-def show_polar_view(data, pole='north', qr=0.45, label=r'$B_{r}$, G', **kwargs):
+def show_polar_view(data, pole='north', qr=0.45, label=r'$B_{los}$, G', **kwargs):
     nx, ny = data.shape
     xc, yc = (nx - 1) / 2, (ny - 1) / 2
     Rsun = qr * nx
