@@ -3,6 +3,7 @@ from astropy.io import fits
 from view import View
 from scipy.ndimage import map_coordinates
 
+
 def reproject(data, header, header_new=None, **kwargs):
     '''
     Reprojects the data obtained from a view defined by 'header' to a view defined by 'header_new'.
