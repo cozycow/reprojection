@@ -97,7 +97,7 @@ def make_map(files, pow=4, polar=False, binning=1, **kwargs):
     '''
     from utils import rebin
 
-    mean, coverage = 0, 0
+    mean, coverage, mu = 0, 0, 0
     for file in files:
         with fits.open(file) as hdul:
             header = hdul[0].header.copy()
@@ -113,7 +113,9 @@ def make_map(files, pow=4, polar=False, binning=1, **kwargs):
 
         coverage += np.nan_to_num(weight)
         mean += np.nan_to_num((data - mean) * weight / coverage)
+        mu += np.nan_to_num((1 / alpha - mu) * weight / coverage)
 
     mean[coverage == 0] = np.nan
+    mu[coverage == 0] = np.nan
     coverage[coverage == 0] = np.nan
-    return mean, coverage
+    return mean, mu
