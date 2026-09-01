@@ -133,7 +133,7 @@ class View:
     def to_heliographic(self, mu_thr=0, origin='image', **kwargs):
         transform = (~self.get_transform(origin, **kwargs) +
                      Normalize((self.xc, self.yc), self.rsun) +
-                     Make3d(self.rsun_arc / 3600, mu_thr=mu_thr))
+                     Make3d(self.rsun_arc / 3600, minmu=mu_thr))
 
         transform += Rotate.z(self.crota * np.pi / 180)
         return transform

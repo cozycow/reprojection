@@ -108,9 +108,10 @@ class Normalize(Transform):
 
 class Make3d(Transform):
 
-    def __init__(self, theta, mu_thr=0, inv=False):
+    def __init__(self, theta, minmu=0, maxmu=1, inv=False):
         self.theta = theta
-        self.mu_thr = mu_thr
+        self.minmu = minmu
+        self.maxmu = maxmu
         self.inv = inv
 
     def __repr__(self):
@@ -127,29 +128,30 @@ class Make3d(Transform):
     def __call__(self, r, alpha=1):
         if not self.inv:
             x, y = r
-            z2 = 1 - x ** 2 - y ** 2
-            if isinstance(z2, np.ndarray):
-                t = np.where(z2 < self.mu_thr ** 2)
-                x[t], y[t], z2[t] = np.nan, np.nan, np.nan
+            z = np.sqrt(1 - x ** 2 - y ** 2)
+            if isinstance(z, np.ndarray):
+                t = np.where(np.any([z < self.minmu,
+                                     z > self.maxmu], axis=0))
+                x[t], y[t], z[t] = np.nan, np.nan, np.nan
             else:
-                if z2 < self.mu_thr ** 2:
+                if z < self.minmu:
                     x, y = np.nan, np.nan
-            z = np.sqrt(z2)
             return self.__paraxial((y, x, z)), alpha * z
         else:
             x, y, z = self.__paraxial(r)
 
             if isinstance(z, np.ndarray):
-                t = np.where(z < self.mu_thr)
+                t = np.where(np.any([z < self.minmu,
+                                     z > self.maxmu], axis=0))
                 x[t], y[t] = np.nan, np.nan
             else:
-                if z < self.mu_thr:
+                if z < self.minmu:
                     x, y = np.nan, np.nan
 
             return (y, x), alpha / z
 
     def __invert__(self):
-        return type(self)(-self.theta, self.mu_thr, not self.inv)
+        return type(self)(-self.theta, self.minmu, self.maxmu, not self.inv)
 
 
 class Rotate(Transform):
