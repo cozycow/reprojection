@@ -91,13 +91,15 @@ def polar_view(data, header, pole='north', return_alpha=False,
         return data_
 
 
-def make_map(files, pow=4, polar=False, binning=1, **kwargs):
+def make_map(files, polar=False, correct_bias=False, pow=4, binning=1, sigma=0.05, **kwargs):
     '''
     Creates an averaged map by applying 'remap' routine to every dataset in files
     '''
     from utils import rebin
 
-    mean, coverage, mu = 0, 0, 0
+    mean_data, mean_alpha, coverage = 0, 0, 0
+    mean_data_, mean_alpha_, coverage_ = 0, 0, 0
+
     for file in files:
         with fits.open(file) as hdul:
             header = hdul[0].header.copy()
@@ -109,13 +111,29 @@ def make_map(files, pow=4, polar=False, binning=1, **kwargs):
             data, alpha = polar_view(data, header, return_alpha=True, **kwargs)
         else:
             data, alpha = remap(data, header, return_alpha=True, **kwargs)
+
         weight = (~np.isnan(data)) * alpha ** (-pow)
-
         coverage += np.nan_to_num(weight)
-        mean += np.nan_to_num((data - mean) * weight / coverage)
-        mu += np.nan_to_num((1 / alpha - mu) * weight / coverage)
+        mean_data += np.nan_to_num((data - mean_data) * weight / coverage)
+        mean_alpha += np.nan_to_num((alpha - mean_alpha) * weight / coverage)
 
-    mean[coverage == 0] = np.nan
-    mu[coverage == 0] = np.nan
-    coverage[coverage == 0] = np.nan
-    return mean, mu
+        if correct_bias:
+            #weight_ = (1 - weight) * weight
+            weight_ = (~np.isnan(data)) * alpha ** (-1)
+            coverage_ += np.nan_to_num(weight_)
+            mean_data_ += np.nan_to_num((data - mean_data_) * weight_ / coverage_)
+            mean_alpha_ += np.nan_to_num((alpha - mean_alpha_) * weight_ / coverage_)
+
+    mean_data[coverage == 0] = np.nan
+    mean_alpha[coverage == 0] = np.nan
+
+    if correct_bias:
+        mean_data_[coverage_ == 0] = np.nan
+        mean_alpha_[coverage_ == 0] = np.nan
+
+        w = (mean_alpha_ - mean_alpha) / (mean_alpha_ + mean_alpha)
+        delta = (mean_data_ - mean_data) / (mean_alpha_ + mean_alpha) * w / (w ** 2 + sigma ** 2)
+        mean_data -= delta * mean_alpha
+        #mean_data = mean_data_ - delta * mean_alpha_
+
+    return mean_data, mean_alpha
