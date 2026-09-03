@@ -91,14 +91,16 @@ def polar_view(data, header, pole='north', return_alpha=False,
         return data_
 
 
-def make_map(files, polar=False, correct_bias=False, pow=4, binning=1, sigma=0.05, **kwargs):
+def make_map(files, polar=False, correct_bias=False, pow=2, binning=1, lam=0.5, **kwargs):
     '''
     Creates an averaged map by applying 'remap' routine to every dataset in files
     '''
     from utils import rebin
 
-    mean_data, mean_alpha, coverage = 0, 0, 0
-    mean_data_, mean_alpha_, coverage_ = 0, 0, 0
+    coverage = 0
+    mean_data = 0
+    mean_alpha, mean_alpha_ = 0, 0
+    cov_data_alpha, var_alpha = 0, 0
 
     for file in files:
         with fits.open(file) as hdul:
@@ -115,25 +117,22 @@ def make_map(files, polar=False, correct_bias=False, pow=4, binning=1, sigma=0.0
         weight = (~np.isnan(data)) * alpha ** (-pow)
         coverage += np.nan_to_num(weight)
         mean_data += np.nan_to_num((data - mean_data) * weight / coverage)
-        mean_alpha += np.nan_to_num((alpha - mean_alpha) * weight / coverage)
 
         if correct_bias:
-            #weight_ = (1 - weight) * weight
-            weight_ = (~np.isnan(data)) * alpha ** (-1)
-            coverage_ += np.nan_to_num(weight_)
-            mean_data_ += np.nan_to_num((data - mean_data_) * weight_ / coverage_)
-            mean_alpha_ += np.nan_to_num((alpha - mean_alpha_) * weight_ / coverage_)
+            mean_alpha_ = mean_alpha + 0
+            mean_alpha += np.nan_to_num((alpha - mean_alpha) * weight / coverage)
+            var_alpha += np.nan_to_num((alpha - mean_alpha) * (alpha - mean_alpha_) * weight)
+            cov_data_alpha += np.nan_to_num((data - mean_data) * (alpha - mean_alpha_) * weight)
 
-    mean_data[coverage == 0] = np.nan
-    mean_alpha[coverage == 0] = np.nan
 
     if correct_bias:
-        mean_data_[coverage_ == 0] = np.nan
-        mean_alpha_[coverage_ == 0] = np.nan
+        var_alpha /= coverage
+        cov_data_alpha /= coverage
+        bias = cov_data_alpha / (var_alpha + lam * mean_alpha ** 2) * mean_alpha
 
-        w = (mean_alpha_ - mean_alpha) / (mean_alpha_ + mean_alpha)
-        delta = (mean_data_ - mean_data) / (mean_alpha_ + mean_alpha) * w / (w ** 2 + sigma ** 2)
-        mean_data -= delta * mean_alpha
-        #mean_data = mean_data_ - delta * mean_alpha_
+        mean_data -= bias
 
-    return mean_data, mean_alpha
+    mean_data[coverage == 0] = np.nan
+    coverage[coverage == 0] = np.nan
+
+    return mean_data, coverage
