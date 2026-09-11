@@ -95,7 +95,7 @@ def make_map(files, polar=False, correct_bias=False, pow=2, binning=1, lam=0.05,
     '''
     Creates an averaged map by applying 'remap' routine to every dataset in files
     '''
-    from utils import rebin
+    from utils import rebin, crop
 
     coverage = 0
     mean_data = 0
@@ -128,11 +128,10 @@ def make_map(files, polar=False, correct_bias=False, pow=2, binning=1, lam=0.05,
     if correct_bias:
         var_alpha /= coverage
         cov_data_alpha /= coverage
-        bias = cov_data_alpha / (var_alpha + lam * mean_alpha ** 2) * mean_alpha
-
-        mean_data -= bias
+        bias = cov_data_alpha / (var_alpha + lam * mean_alpha ** 2)
+        mean_data -= bias * mean_alpha
 
     mean_data[coverage == 0] = np.nan
     coverage[coverage == 0] = np.nan
-
     return mean_data, coverage
+

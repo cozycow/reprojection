@@ -27,3 +27,15 @@ def rebin(image, k, axis=None, update_header=None):
         for i in range(len(image)):
             out.append(rebin(image[i], k, axis=axis))
         return np.array(out)
+
+
+def crop(image, header=None, x1=None, x2=None, y1=None, y2=None, **kwargs):
+    if header is not None:
+        x1, x2, y1, y2 = header['PXBEG2'] - 1, header['PXEND2'], header['PXBEG1'] - 1, header['PXEND1']
+    nx, ny = x2 - x1 + 1, y2 - y1 + 1
+
+    if (isinstance(image, np.ndarray) and (len(image.shape) > 1) and (image.shape[-2:] != (nx, ny)) and
+            x1 is not None and x2 is not None and y1 is not None and y2 is not None):
+        return image[..., x1:x2, y1:y2]
+    else:
+        return image

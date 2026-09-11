@@ -119,7 +119,7 @@ class Make3d(Transform):
 
     def __paraxial(self, r):
         x, y, z = r
-        q = np.tan(self.theta * np.pi / 180)
+        q = np.sin(self.theta * np.pi / 180)
         u = np.sqrt(1 - q ** 2) / (1 + q * z)
         x, y = x * u, y * u
         z = (z + q) / (1 + q * z)
