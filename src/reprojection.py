@@ -107,7 +107,6 @@ def make_map(files, polar=False, correct_bias=False, pow=2, binning=1, lam=0.05,
             header = hdul[0].header.copy()
             data = hdul[0].data.copy()
 
-        #data -= np.nanmedian(data)
         data = rebin(data, binning, update_header=header)
 
         if polar:
