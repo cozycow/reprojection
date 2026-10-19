@@ -253,14 +253,14 @@ class ToSynoptic(Transform):
         else:
             return super().__new__(cls)
 
-    def __init__(self, crln, A, B, C, Wsid, Wsyn, delta_lon=180, inv=False):
+    def __init__(self, crln, A, B, C, Wsid, Wsyn, delta_t=1, inv=False):
         self.crln = crln
         self.A = A
         self.B = B
         self.C = C
         self.Wsid = Wsid
         self.Wsyn = Wsyn
-        self.delta_lon = delta_lon
+        self.delta_t = delta_t
         self.inv = inv
 
     def __repr__(self):
@@ -273,20 +273,20 @@ class ToSynoptic(Transform):
         W = self.A + self.B * sin2 + self.C * sin2 ** 2
         Wobs = self.Wsid - self.Wsyn
 
-        q = 1 - (W - self.Wsid) / (W - Wobs)
+        q = self.Wsyn / (W - Wobs)
         if self.inv:
             q = 1 / q
 
         dphi = phi - self.crln
         dphi = (dphi + 180) % 360 - 180
 
-        dphi[np.abs(dphi) > self.delta_lon] = np.nan
+        dphi[np.abs(dphi) / self.Wsyn > self.delta_t] = np.nan
         phi = self.crln + dphi * q
 
         return (theta, phi), alpha
 
     def __invert__(self):
-        return type(self)(self.crln, A=self.A, B=self.B, C=self.C, Wsid=self.Wsid, Wsyn=self.Wsyn, delta_lon=self.delta_lon, inv=not self.inv)
+        return type(self)(self.crln, A=self.A, B=self.B, C=self.C, Wsid=self.Wsid, Wsyn=self.Wsyn, delta_t=self.delta_t, inv=not self.inv)
 
 
 class Filter(Transform):

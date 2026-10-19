@@ -91,16 +91,14 @@ def polar_view(data, header, pole='north', return_alpha=False,
         return data_
 
 
-def make_map(files, polar=False, correct_bias=False, pow=2, binning=1, lam=0.05, **kwargs):
+def make_map(files, polar=False, pow=2, binning=1, **kwargs):
     '''
     Creates an averaged map by applying 'remap' routine to every dataset in files
     '''
-    from utils import rebin, crop
+    from utils import rebin
 
     coverage = 0
     mean_data = 0
-    mean_alpha, mean_alpha_ = 0, 0
-    cov_data_alpha, var_alpha = 0, 0
 
     for file in files:
         with fits.open(file) as hdul:
@@ -117,19 +115,6 @@ def make_map(files, polar=False, correct_bias=False, pow=2, binning=1, lam=0.05,
         weight = (~np.isnan(data)) * alpha ** (-pow)
         coverage += np.nan_to_num(weight)
         mean_data += np.nan_to_num((data - mean_data) * weight / coverage)
-
-        if correct_bias:
-            mean_alpha_ = mean_alpha + 0
-            mean_alpha += np.nan_to_num((alpha - mean_alpha) * weight / coverage)
-            var_alpha += np.nan_to_num((alpha - mean_alpha) * (alpha - mean_alpha_) * weight)
-            cov_data_alpha += np.nan_to_num((data - mean_data) * (alpha - mean_alpha_) * weight)
-
-
-    if correct_bias:
-        var_alpha /= coverage
-        cov_data_alpha /= coverage
-        bias = cov_data_alpha / (var_alpha + lam * mean_alpha ** 2)
-        mean_data -= bias * mean_alpha
 
     mean_data[coverage == 0] = np.nan
     coverage[coverage == 0] = np.nan
