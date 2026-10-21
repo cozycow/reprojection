@@ -91,7 +91,7 @@ def polar_view(data, header, pole='north', return_alpha=False,
         return data_
 
 
-def make_map(files, polar=False, pow=2, binning=1, **kwargs):
+def make_map_(files, polar=False, pow=2, binning=1, **kwargs):
     '''
     Creates an averaged map by applying 'remap' routine to every dataset in files
     '''
@@ -120,3 +120,50 @@ def make_map(files, polar=False, pow=2, binning=1, **kwargs):
     coverage[coverage == 0] = np.nan
     return mean_data, coverage
 
+
+def make_map(files, polar=False, correct_bias=False, **kwargs):
+    '''
+    Creates an averaged map by applying 'remap' routine to every dataset in files
+    '''
+
+    coverage = 0
+    mean_data = 0
+    mean_mu = 0
+    var_data = 0
+    var_mu = 0
+    cov_data_mu = 0
+
+    for file in files:
+        mean_mu_ = mean_mu + 0.
+
+        with fits.open(file) as hdul:
+            header = hdul[0].header.copy()
+            data = hdul[0].data.copy()
+
+        if polar:
+            data, alpha = polar_view(data, header, return_alpha=True, correct_mu=False, **kwargs)
+        else:
+            data, alpha = remap(data, header, return_alpha=True, correct_mu=False, **kwargs)
+
+        mu = 1 / alpha
+
+        weight = (~np.isnan(data)).astype(float) #* mu
+        coverage += np.nan_to_num(weight)
+
+        mean_mu += np.nan_to_num((mu - mean_mu) * weight / coverage)
+        mean_data += np.nan_to_num((data - mean_data) * weight / coverage)
+
+        if correct_bias:
+            var_mu += np.nan_to_num((mu - mean_mu) * (mu - mean_mu_) * weight)
+            cov_data_mu += np.nan_to_num((data - mean_data) * (mu - mean_mu_) * weight)
+        else:
+            var_mu += np.nan_to_num((mu ** 2 - var_mu) * weight / coverage)
+            cov_data_mu += np.nan_to_num((data * mu - cov_data_mu) * weight / coverage)
+
+    cov_data_mu[coverage == 0] = np.nan
+    var_mu[coverage == 0] = np.nan
+    coverage[coverage == 0] = np.nan
+
+    Q = cov_data_mu / var_mu
+
+    return Q, coverage
