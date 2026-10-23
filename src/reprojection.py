@@ -91,7 +91,7 @@ def polar_view(data, header, pole='north', return_alpha=False,
         return data_
 
 
-def make_map_(files, polar=False, correct_bias=False, **kwargs):
+def make_map(files, polar=False, correct_bias=False, **kwargs):
     '''
     Creates an averaged map by applying 'remap' routine to every dataset in files
     '''
@@ -138,7 +138,7 @@ def make_map_(files, polar=False, correct_bias=False, **kwargs):
     return Q, coverage
 
 
-def make_map(files, polar=False, **kwargs):
+def make_map_(files, polar=False, **kwargs):
     '''
     Creates an averaged map by applying 'remap' routine to every dataset in files
     '''
