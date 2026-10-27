@@ -115,6 +115,10 @@ class View:
 
         return cls(nx, ny, xc, yc, rsun, crota, crlt, crln, hgln, vr, vw, vn, rsun_arc, dsun)
 
+    @property
+    def wsyn(self):
+        return WSID - self.vw / self.dsun / np.cos(self.crlt * np.pi / 180) / np.pi * 180 * 24 * 60 * 60
+
     def get_transform(self, name='image', **kwargs):
         return getattr(self, 'to_' + name, Pipe)(**kwargs)
 
@@ -136,9 +140,8 @@ class View:
                      Rotate.y(crln * np.pi / 180))
 
         if correct_dr:
-            wsyn = WSID - self.vw / self.dsun / np.cos(self.crlt * np.pi / 180) / np.pi * 180 * 24 * 60 * 60
             transform += (ToSpherical() +
-                         ToSynoptic(crln, Wsid=WSID, Wsyn=wsyn, A=A, B=B, C=C, delta_t=delta_t) -
+                         ToSynoptic(crln, Wsid=WSID, Wsyn=self.wsyn, A=A, B=B, C=C, delta_t=delta_t) -
                          ToSpherical())
         return transform
 
