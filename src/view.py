@@ -37,7 +37,7 @@ class View:
     def copy(self):
         return View(**self.__dict__)
 
-    def update(self, increment=False, inplace=False, **kwargs):
+    def update(self, increment=False, multiply=False, inplace=False, **kwargs):
         if not inplace:
             view_new = self.copy()
         else:
@@ -48,6 +48,8 @@ class View:
                        'vr', 'vw', 'vn', 'rsun_arc', 'dsun']:
                 if increment:
                     setattr(view_new, key, getattr(self, key) + value)
+                elif multiply:
+                    setattr(view_new, key, getattr(self, key) * value)
                 else:
                     setattr(view_new, key, value)
 
@@ -114,6 +116,47 @@ class View:
             dsun = AU
 
         return cls(nx, ny, xc, yc, rsun, crota, crlt, crln, hgln, vr, vw, vn, rsun_arc, dsun)
+
+
+    def to_header(self, header_new, inplace=False):
+        if inplace:
+            header_new = header_new
+        else:
+            header_new = header_new.copy()
+
+
+        header_new['NAXIS2'] = self.nx
+        header_new['NAXIS1'] = self.ny
+        header_new['CRPIX2'] = self.xc
+        header_new['CRPIX1'] = self.yc
+
+        if 'RSUN_ARC' in header_new:
+            header_new['RSUN_ARC'] = self.rsun_arc
+        elif 'RSUN_OBS' in header_new:
+            header_new['RSUN_OBS'] = self.rsun_arc
+
+        if 'CROTA' in header_new:
+            header_new['CROTA'] = self.crota
+        elif 'CROTA2' in header_new:
+            header_new['CROTA2'] = self.crota
+
+        header_new['CRLT_OBS'] = self.crlt
+        header_new['CRLN_OBS'] = self.crln
+
+        if 'HGLN_OBS' in header_new:
+            header_new['HGLN_OBS'] = self.hgln
+
+        if 'RADIUS' in header_new:
+            header_new['RADIUS'] = self.rsun
+
+        if 'DSUN_OBS' in header_new:
+            header_new['DSUN_OBS'] = self.dsun
+
+        header_new['CDELT1'] = self.rsun_arc / self.rsun
+        header_new['CDELT2'] = self.rsun_arc / self.rsun
+
+        return header_new
+
 
     @property
     def wsyn(self):
