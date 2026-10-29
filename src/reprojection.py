@@ -91,10 +91,12 @@ def polar_view(data, header, pole='north', return_alpha=False,
         return data_
 
 
-def make_map(files, polar=False, correct_bias=False, **kwargs):
+def make_map(files, polar=False, correct_bias=False, correct_crota=True, binning=1, **kwargs):
     '''
     Creates an averaged map by applying 'remap' routine to every dataset in files
     '''
+
+    from utils import rebin
 
     coverage = 0
     mean_data = 0
@@ -106,8 +108,17 @@ def make_map(files, polar=False, correct_bias=False, **kwargs):
         mean_mu_ = mean_mu + 0.
 
         with fits.open(file) as hdul:
-            header = hdul[0].header.copy()
-            data = hdul[0].data.copy()
+            if 'hmi' in file:
+                data = hdul[1].data.copy()
+                header = hdul[1].header.copy()
+            else: # 'fdt'
+                data = hdul[0].data.copy()
+                header = hdul[0].header.copy()
+
+                if correct_crota:
+                    header['CROTA'] = header['CROTA'] + 0.25 ### crota correction
+
+        data = rebin(data, binning, update_header=header)
 
         if polar:
             data, alpha = polar_view(data, header, return_alpha=True, correct_mu=False, **kwargs)
@@ -137,44 +148,3 @@ def make_map(files, polar=False, correct_bias=False, **kwargs):
 
     return Q, coverage
 
-
-def make_map_(files, polar=False, **kwargs):
-    '''
-    Creates an averaged map by applying 'remap' routine to every dataset in files
-    '''
-
-    coverage = 0
-    mean_data = 0
-    mean_mu = 0
-    var_mu = 0
-    cov_data_mu = 0
-
-    for file in files:
-        with fits.open(file) as hdul:
-            header = hdul[0].header.copy()
-            data = hdul[0].data.copy()
-
-        if polar:
-            data, alpha = polar_view(data, header, return_alpha=True, correct_mu=False, **kwargs)
-        else:
-            data, alpha = remap(data, header, return_alpha=True, correct_mu=False, **kwargs)
-
-        mu = 1 / alpha
-
-        weight = (~np.isnan(data)).astype(float)
-        coverage += np.nan_to_num(weight)
-
-        mean_mu += np.nan_to_num((mu - mean_mu) * weight / coverage)
-        mean_data += np.nan_to_num((data - mean_data) * weight / coverage)
-
-        var_mu += np.nan_to_num((mu ** 2 - var_mu) * weight / coverage)
-        cov_data_mu += np.nan_to_num((data * mu - cov_data_mu) * weight / coverage)
-
-    mean_mu[coverage == 0] = np.nan
-    mean_data[coverage == 0] = np.nan
-
-    cov_data_mu[coverage == 0] = np.nan
-    var_mu[coverage == 0] = np.nan
-    coverage[coverage == 0] = np.nan
-
-    return coverage, mean_mu, mean_data, var_mu, cov_data_mu

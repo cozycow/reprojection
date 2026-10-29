@@ -173,9 +173,14 @@ class View:
         transform += Rotate.z(self.crota * np.pi / 180)
         return transform
 
-    def to_carrington(self, origin='image', correct_dr=False, delta_t=1, **kwargs):
+    def to_carrington(self, origin='image', correct_dr=False, delta_t=1, stonyhurst=False, **kwargs):
         tdel = (AU - self.dsun) / CLIGHT
         crln = self.crln + tdel * WSID / 24 / 3600
+
+        if stonyhurst:
+            crln0 = crln - self.hgln
+        else:
+            crln0 = crln
 
         transform = (~self.get_transform(origin, **kwargs) +
                      self.to_heliographic(**kwargs) -
@@ -184,7 +189,7 @@ class View:
 
         if correct_dr:
             transform += (ToSpherical() +
-                         ToSynoptic(crln, Wsid=WSID, Wsyn=self.wsyn, A=A, B=B, C=C, delta_t=delta_t) -
+                         ToSynoptic(crln0, A, B, C, WSID, self.wsyn, delta_t=delta_t) -
                          ToSpherical())
         return transform
 
