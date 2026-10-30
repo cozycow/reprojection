@@ -125,7 +125,6 @@ class View:
         :return:
         '''
 
-
         if inplace:
             header_new = header
         else:
