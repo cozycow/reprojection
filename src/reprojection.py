@@ -1,10 +1,9 @@
 import numpy as np
 from astropy.io import fits
 from view import View
-from scipy.ndimage import map_coordinates
 
 
-def reproject(data, header, header_new=None, **kwargs):
+def reproject(data, header, header_new=None, correct_mu=True, **kwargs):
     '''
     Reprojects the data obtained from a view defined by 'header' to a view defined by 'header_new'.
     '''
@@ -16,42 +15,22 @@ def reproject(data, header, header_new=None, **kwargs):
 
     view = View.from_header(header)
     view_new = View.from_header(header_).update(**kwargs)
-    return view_new.reproject(data, view, **kwargs)
+
+    data_, alpha = view_new.reproject(data, view, **kwargs)
+    if correct_mu:
+        data_ *= alpha
+
+    return data_
 
 
-def remap(data, header, nx=720, ny=1800, sine_lat=False,
-          staggered_lat=False, return_alpha=False, correct_mu=True, **kwargs):
+def remap(data, header, nx=720, ny=1800,
+          return_alpha=False, correct_mu=True, **kwargs):
     '''
     Remaps the data obtained from a view defined by 'header' to spherical (Carrington) coordinates.
     '''
 
-    from transforms import ToSpherical
-
     view = View.from_header(header).update(**kwargs)
-    transform = ~ToSpherical() - view.to_carrington(**kwargs)
-
-    dlon = 360 / ny
-
-    if sine_lat:
-        lat_spread = 2
-    else:
-        lat_spread = 180
-
-    if staggered_lat:
-        dlat = lat_spread / nx
-    else:
-        dlat = lat_spread / (nx - 1)
-
-    grid = np.mgrid[-lat_spread / 2:lat_spread / 2 + dlat / 2:dlat, :360:dlon]
-
-    if staggered_lat:
-        grid = np.array([(grid[0][1:] + grid[0][:-1]) / 2, grid[1][1:]])
-
-    if sine_lat:
-        grid[0] = np.arcsin(grid[0].clip(-1,1)) * 180 / np.pi
-
-    grid, alpha = transform(grid)
-    data_ = map_coordinates(np.nan_to_num(data), grid, cval=np.nan)
+    data_, alpha = view.remap(data, nx=nx, ny=ny, **kwargs)
 
     if correct_mu:
         data_ *= alpha
@@ -73,14 +52,8 @@ def polar_view(data, header, pole='north', return_alpha=False,
     else:
         view_new = View(nx, ny, xc, yc, Rsun, 90, -90, 0) ### South pole view
 
-    grid = view_new.grid()
     view = View.from_header(header)
-
-    transform = (view_new.to_carrington() -
-                 view.to_carrington(**kwargs))
-
-    grid, alpha = transform(grid)
-    data_ = map_coordinates(np.nan_to_num(data), grid, cval=np.nan)
+    data_, alpha = view_new.reproject(data, view, **kwargs)
 
     if correct_mu:
         data_ *= alpha

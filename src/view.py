@@ -4,7 +4,6 @@ from transforms import *
 
 
 WSID = 360 / 25.38
-WSYN = 360 / 27.2753
 AU = 149597870691.
 CLIGHT = 299792458
 RSUN = 696e8
@@ -118,12 +117,19 @@ class View:
         return cls(nx, ny, xc, yc, rsun, crota, crlt, crln, hgln, vr, vw, vn, rsun_arc, dsun)
 
 
-    def to_header(self, header_new, inplace=False):
-        if inplace:
-            header_new = header_new
-        else:
-            header_new = header_new.copy()
+    def update_header(self, header, inplace=False):
+        '''
+        Updates WCS information in header
 
+        :param header:
+        :return:
+        '''
+
+
+        if inplace:
+            header_new = header
+        else:
+            header_new = header.copy()
 
         header_new['NAXIS2'] = self.nx
         header_new['NAXIS1'] = self.ny
@@ -194,17 +200,29 @@ class View:
         return transform
 
     def grid(self, origin='image', **kwargs):
-        grid = np.mgrid[:self.nx, :self.ny].astype(np.float32)
+        grid = tuple(np.mgrid[:self.nx, :self.ny].astype(np.float32))
         transform = self.get_transform(origin, **kwargs)
         grid, _ = transform(grid)
         return grid
 
-    def reproject(self, image, view, correct_mu=False, **kwargs):
-        transform = self.to_carrington(**kwargs) - view.to_carrington(**kwargs)
+    def reproject(self, image, view, **kwargs):
+        transform = self.to_carrington() - view.to_carrington(**kwargs)
         grid = self.grid(**kwargs)
         grid_, alpha = transform(grid)
 
         image_ = map_coordinates(np.nan_to_num(image), grid_, cval=np.nan)
-        if correct_mu:
-            image_ *= alpha
-        return image_
+        return image_, alpha
+
+    def remap(self, image, nx=720, ny=1800, sine_lat=False, **kwargs):
+        transform = self.to_carrington(**kwargs) + ToSpherical()
+
+        dlat, dlon = 180 / (nx - 1), 360 / ny
+        if sine_lat:
+            sine_transform = Custom(lambda r, alpha: ((np.sin(r[0] * np.pi / 180) * 90,) + r[1:], alpha),
+                                    lambda r, alpha: ((np.arcsin(r[0] / 90) * 180 / np.pi,) + r[1:], alpha))
+            transform = transform + sine_transform
+
+        grid = tuple(np.mgrid[-90:90 + dlat / 2:dlat, :360:dlon])
+        grid, alpha = (~transform)(grid)
+        image_ = map_coordinates(np.nan_to_num(image), grid, cval=np.nan)
+        return image_, alpha
