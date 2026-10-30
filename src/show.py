@@ -7,14 +7,12 @@ from transforms import ToSpherical
 from view import View
 
 
-def show_data(data, view, title='', label='', figsize=(10,10), cmap='hmimag', vmin=-200, vmax=200,
+def show_data(data, view, title='', label=r'$B_{r}$, G', figsize=(10,10), cmap='hmimag', vmin=-200, vmax=200,
               grid_alpha=0.5, grid_color='black', text_alpha=1, text_color='black',
               to_file=None):
 
-    transform = ~(view.to_carrington(mu_thr=-1e-8) + ToSpherical())
-    _, _, mu = view.grid(origin='heliographic')
+    transform = ~(view.to_carrington(minmu=-1e-8) + ToSpherical())
     data_ = data.copy()
-    data_[np.isnan(mu)] = np.nan
 
     grid = np.mgrid[-90:90.5:1,0:360.5:1]
     grid, _ = transform(grid)
@@ -62,21 +60,8 @@ def show_data(data, view, title='', label='', figsize=(10,10), cmap='hmimag', vm
         plt.close(fig)
 
 
-def show_polar_view(data, pole='north', qr=0.45, label=r'$B_{los}$, G', **kwargs):
-    nx, ny = data.shape
-    xc, yc = (nx - 1) / 2, (ny - 1) / 2
-    Rsun = qr * nx
-
-    if pole == 'north':
-        view = View(nx, ny, xc, yc, Rsun, -90, 90, 0) ### North pole view
-    else:
-        view = View(nx, ny, xc, yc, Rsun, 90, -90, 0) ### South pole view
-
-    return show_data(data, view, label=label, **kwargs)
-
-
-def show_map(data, figsize=(15,8), label=r'$B_{r}$, G', cmap='hmimag', vmin=-50, vmax=50, sine_lat=False, **kwargs):
-    if sine_lat:
+def show_map(data, map, figsize=(15,8), label=r'$B_{r}$, G', cmap='hmimag', vmin=-50, vmax=50, **kwargs):
+    if map.projection == 'sine_lat':
         extent = (0, 360, -1, 1)
     else:
         extent = (0, 360, -90, 90)
@@ -86,7 +71,7 @@ def show_map(data, figsize=(15,8), label=r'$B_{r}$, G', cmap='hmimag', vmin=-50,
                    extent=extent, aspect='auto', **kwargs)
 
     ax.set_xticks(np.arange(0,361,30), np.arange(0,361,30))
-    if sine_lat:
+    if map.projection == 'sine_lat':
         ax.set_yticks(np.sin(np.arange(-90, 91, 15) * np.pi / 180), np.arange(-90, 91, 15))
     else:
         ax.set_yticks(np.arange(-90, 91, 15), np.arange(-90, 91, 15))
@@ -101,33 +86,3 @@ def show_map(data, figsize=(15,8), label=r'$B_{r}$, G', cmap='hmimag', vmin=-50,
     plt.tight_layout()
 
 
-def plot_flux(*args, sine_lat=False, staggered_lat=False):
-    plt.figure(figsize=(10,8))
-
-    for flux in args:
-        nx = len(flux)
-
-        if sine_lat:
-            spread = 2
-        else:
-            spread = 180
-
-        if staggered_lat:
-            dlat = spread / nx
-            lati = np.arange(-spread / 2,spread / 2 + dlat / 2, dlat)
-            lat = (lati[1:] + lati[:-1]) / 2
-        else:
-            dlat = spread / (nx - 1)
-            lat = np.arange(-spread / 2,spread / 2 + dlat / 2, dlat)
-
-        if sine_lat:
-            lat = np.arcsin(lat.clip(-1,1)) * 180 / np.pi
-
-        plt.plot(lat, flux)
-
-    plt.xlim(-90,90)
-    plt.ylim(-10,10)
-
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()

@@ -81,7 +81,7 @@ class Pipe(Transform, list):
 
 class Normalize(Transform):
     def __new__(cls, *args, **kwargs):
-        if all(np.abs(x) < 1e-8 for x in args[0]) and (abs(args[1] - 1.) < 1e-8):
+        if all(abs(x) < 1e-8 for x in args[0]) and all(abs(x - 1.) < 1e-8 for x in args[1]):
             return Pipe()
         else:
             return super().__new__(cls)
@@ -94,16 +94,16 @@ class Normalize(Transform):
         return f'Normalize(shift:{self.shift}, scale:{self.scale})'
 
     def __call__(self, r, alpha=1):
-        return tuple((x - a) / self.scale for x, a in zip(r, self.shift)), alpha
+        return tuple((x - a) / b for x, a, b in zip(r, self.shift, self.scale)), alpha
 
     def __invert__(self):
-        return type(self)(tuple(-x / self.scale for x in self.shift), 1 / self.scale)
+        return type(self)(tuple(-x / y for x, y in zip(self.shift, self.scale)), tuple(1 / x for x in self.scale))
 
     def __add__(self, other):
-        if isinstance(other, type(self)):
-            return type(self)(tuple(x + y * self.scale for x, y in zip(self.shift, other.shift)), self.scale * other.scale)
-        else:
-            return super().__add__(other)
+        #if isinstance(other, type(self)):
+        #    return type(self)(tuple(x + y * self.scale for x, y in zip(self.shift, other.shift)), self.scale * other.scale)
+        #else:
+        return super().__add__(other)
 
 
 class Make3d(Transform):
@@ -253,14 +253,13 @@ class ToSynoptic(Transform):
         else:
             return super().__new__(cls)
 
-    def __init__(self, crln, A, B, C, Wsid, Wsyn, delta_t=1, inv=False):
+    def __init__(self, crln, A, B, C, Wsid, Wsyn, inv=False):
         self.crln = crln
         self.A = A
         self.B = B
         self.C = C
         self.Wsid = Wsid
         self.Wsyn = Wsyn
-        self.delta_t = delta_t
         self.inv = inv
 
     def __repr__(self):
@@ -280,13 +279,11 @@ class ToSynoptic(Transform):
         dphi = phi - self.crln
         dphi = (dphi + 180) % 360 - 180
 
-        dphi[np.abs(dphi) / self.Wsyn > self.delta_t] = np.nan
         phi = self.crln + dphi * q
-
         return (theta, phi), alpha
 
     def __invert__(self):
-        return type(self)(self.crln, A=self.A, B=self.B, C=self.C, Wsid=self.Wsid, Wsyn=self.Wsyn, delta_t=self.delta_t, inv=not self.inv)
+        return type(self)(self.crln, A=self.A, B=self.B, C=self.C, Wsid=self.Wsid, Wsyn=self.Wsyn, inv=not self.inv)
 
 
 class Filter(Transform):

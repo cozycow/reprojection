@@ -163,17 +163,21 @@ class View:
 
         return header_new
 
-
     @property
     def wsyn(self):
         return WSID - self.vw / self.dsun / np.cos(self.crlt * np.pi / 180) / np.pi * 180 * 24 * 60 * 60
+
+    @property
+    def grid(self):
+        grid = tuple(np.mgrid[:self.nx, :self.ny].astype(np.float32))
+        return grid
 
     def get_transform(self, name='image', **kwargs):
         return getattr(self, 'to_' + name, Pipe)(**kwargs)
 
     def to_heliographic(self, minmu=0, maxmu=1, origin='image', **kwargs):
         transform = (~self.get_transform(origin, **kwargs) +
-                     Normalize((self.xc, self.yc), self.rsun) +
+                     Normalize((self.xc, self.yc), (self.rsun, self.rsun)) +
                      Make3d(self.rsun_arc / 3600, minmu=minmu, maxmu=maxmu))
 
         transform += Rotate.z(self.crota * np.pi / 180)
@@ -194,35 +198,50 @@ class View:
                      Rotate.y(crln * np.pi / 180))
 
         if correct_dr:
-            transform += (ToSpherical() +
-                         ToSynoptic(crln0, A, B, C, WSID, self.wsyn, delta_t=delta_t) -
-                         ToSpherical())
-        return transform
+            clip_filter = Filter(lambda r: np.abs((r[1] - crln + 180) % 360 - 180) / self.wsyn < delta_t)
 
-    def grid(self, origin='image', **kwargs):
-        grid = tuple(np.mgrid[:self.nx, :self.ny].astype(np.float32))
-        transform = self.get_transform(origin, **kwargs)
-        grid, _ = transform(grid)
-        return grid
+            transform += (ToSpherical() +
+                          ToSynoptic(crln0, A, B, C, WSID, self.wsyn) +
+                          clip_filter -
+                          ToSpherical())
+        return transform
 
     def reproject(self, image, view, **kwargs):
         transform = self.to_carrington() - view.to_carrington(**kwargs)
-        grid = self.grid(**kwargs)
-        grid_, alpha = transform(grid)
+        grid_, alpha = transform(self.grid)
 
         image_ = map_coordinates(np.nan_to_num(image), grid_, cval=np.nan)
         return image_, alpha
 
-    def remap(self, image, nx=720, ny=1800, sine_lat=False, **kwargs):
-        transform = self.to_carrington(**kwargs) + ToSpherical()
 
-        dlat, dlon = 180 / (nx - 1), 360 / ny
-        if sine_lat:
+class Map:
+    def __init__(self, nx, ny, projection=None):
+        self.nx = nx
+        self.ny = ny
+        self.projection = projection
+
+    def copy(self):
+        return Map(**self.__dict__)
+
+    @property
+    def grid(self):
+        grid = tuple(np.mgrid[:self.nx, :self.ny].astype(np.float32))
+        return grid
+
+    def to_carrington(self, **kwargs):
+        transform = Normalize(((self.nx - 1) / 2, 0), ((self.nx - 1) / 180, self.ny / 360))
+
+        if self.projection == 'sine_lat':
             sine_transform = Custom(lambda r, alpha: ((np.sin(r[0] * np.pi / 180) * 90,) + r[1:], alpha),
                                     lambda r, alpha: ((np.arcsin(r[0] / 90) * 180 / np.pi,) + r[1:], alpha))
-            transform = transform + sine_transform
+            transform -= sine_transform
 
-        grid = tuple(np.mgrid[-90:90 + dlat / 2:dlat, :360:dlon])
-        grid, alpha = (~transform)(grid)
-        image_ = map_coordinates(np.nan_to_num(image), grid, cval=np.nan)
+        transform -= ToSpherical()
+        return transform
+
+    def reproject(self, image, view, **kwargs):
+        transform = self.to_carrington() - view.to_carrington(**kwargs)
+        grid_, alpha = transform(self.grid)
+
+        image_ = map_coordinates(np.nan_to_num(image), grid_, cval=np.nan)
         return image_, alpha
