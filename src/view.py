@@ -197,11 +197,14 @@ class View:
                      Rotate.y(crln * np.pi / 180))
 
         if correct_dr:
-            clip_filter = Filter(lambda r: np.abs((r[1] - crln + 180) % 360 - 180) / self.wsyn < delta_t)
+            transform += ToSynoptic(crln0 * np.pi / 180, A, B, C, WSID, self.wsyn)
+
+        if False:#correct_dr:
+            #clip_filter = Filter(lambda r: np.abs((r[1] - crln + 180) % 360 - 180) / self.wsyn < delta_t)
 
             transform += (ToSpherical() +
-                          ToSynoptic(crln0, A, B, C, WSID, self.wsyn) +
-                          clip_filter -
+                          ToSynoptic1(crln0, A, B, C, WSID, self.wsyn) -
+                          #clip_filter -
                           ToSpherical())
         return transform
 
@@ -221,6 +224,18 @@ class Map:
 
     def copy(self):
         return Map(**self.__dict__)
+
+    def update(self, inplace=False, **kwargs):
+        if not inplace:
+            view_new = self.copy()
+        else:
+            view_new = self
+
+        for key, value in kwargs.items():
+            if key in ['nx', 'ny']:
+                setattr(view_new, key, value)
+
+        return view_new
 
     @property
     def grid(self):

@@ -191,7 +191,13 @@ class Rotate(Transform):
 
     @classmethod
     def __from_axis_angle(cls, axis, angle):
-        return cls(np.cos(angle / 2), *(np.array(axis) * np.sin(angle / 2)))
+        axis = np.array(axis)
+        angle = np.expand_dims(np.array(angle), 0)
+
+        while len(axis.shape) < len(angle.shape):
+            axis = np.expand_dims(axis, -1)
+
+        return cls(np.cos(angle / 2), *(axis * np.sin(angle / 2)))
 
     @classmethod
     def x(cls, angle):
@@ -209,13 +215,51 @@ class Rotate(Transform):
         return cls.__from_axis_angle(axis, angle)
 
     def __call__(self, r, alpha=1):
-        return tuple((self * type(self)(0, *r) * (~self)).u), alpha
+        return tuple(np.squeeze((self * type(self)(0, *r) * (~self)).u)), alpha
 
     def __add__(self, other):
         if isinstance(other, type(self)):
             return other * self
         else:
             return super().__add__(other)
+
+
+class ToSynoptic(Transform):
+
+    def __new__(cls, *args, **kwargs):
+        if len(args) == 5 and all(arg == 0 for arg in args):
+            return Pipe()
+        else:
+            return super().__new__(cls)
+
+    def __init__(self, crln, A, B, C, Wsid, Wsyn, inv=False):
+        self.crln = crln
+        self.A = A
+        self.B = B
+        self.C = C
+        self.Wsid = Wsid
+        self.Wsyn = Wsyn
+        self.inv = inv
+
+    def __repr__(self):
+        return f'ToSynoptic(A:{self.A}, B:{self.B}, C:{self.C})'
+
+    def __call__(self, r, alpha=1):
+        W = self.A + self.B * r[1] ** 2 + self.C * r[1] ** 4
+        Wobs = self.Wsid - self.Wsyn
+        q = self.Wsyn / (W - Wobs)
+
+        a, b = np.cos(self.crln), np.sin(self.crln)
+        dphi = np.arctan2(a * r[0] - b * r[2], a * r[2] + b * r[0])
+
+        if self.inv:
+            q = 1 / q
+
+        rot = Rotate.y(dphi * (q - 1))
+        return rot(r, alpha)
+
+    def __invert__(self):
+        return type(self)(self.crln, A=self.A, B=self.B, C=self.C, Wsid=self.Wsid, Wsyn=self.Wsyn, inv=not self.inv)
 
 
 class ToSpherical(Transform):
@@ -243,47 +287,6 @@ class ToSpherical(Transform):
 
     def __invert__(self):
         return ToSpherical(not self.inv)
-
-
-class ToSynoptic(Transform):
-
-    def __new__(cls, *args, **kwargs):
-        if len(kwargs) == 5 and all(value == 0 for value in kwargs.values()):
-            return Pipe()
-        else:
-            return super().__new__(cls)
-
-    def __init__(self, crln, A, B, C, Wsid, Wsyn, inv=False):
-        self.crln = crln
-        self.A = A
-        self.B = B
-        self.C = C
-        self.Wsid = Wsid
-        self.Wsyn = Wsyn
-        self.inv = inv
-
-    def __repr__(self):
-        return f'ToSynoptic(A:{self.A}, B:{self.B}, C:{self.C})'
-
-    def __call__(self, r, alpha=1):
-        theta, phi = r
-        sin2 = np.sin(theta * np.pi / 180) ** 2
-
-        W = self.A + self.B * sin2 + self.C * sin2 ** 2
-        Wobs = self.Wsid - self.Wsyn
-
-        q = self.Wsyn / (W - Wobs)
-        if self.inv:
-            q = 1 / q
-
-        dphi = phi - self.crln
-        dphi = (dphi + 180) % 360 - 180
-
-        phi = self.crln + dphi * q
-        return (theta, phi), alpha
-
-    def __invert__(self):
-        return type(self)(self.crln, A=self.A, B=self.B, C=self.C, Wsid=self.Wsid, Wsyn=self.Wsyn, inv=not self.inv)
 
 
 class Filter(Transform):
