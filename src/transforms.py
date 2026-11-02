@@ -174,7 +174,7 @@ class Rotate(Transform):
     @property
     def angle(self):
         q = np.sqrt(sum(x ** 2 for x in self.u))
-        return float(2 * np.arctan2(q, self.w) * np.pi / 180)
+        return float(2 * np.arctan2(q, self.w) * 180 / np.pi)
 
     def __repr__(self):
         return f'Rotate(axis:{self.axis}, angle:{self.angle})'
@@ -189,29 +189,30 @@ class Rotate(Transform):
         return type(self)(self.w / q, *(-x / q for x in self.u))
 
     @classmethod
-    def __from_axis_angle(cls, axis, angle):
-        axis = np.array(axis)
-        angle = np.expand_dims(np.array(angle), 0)
+    def from_axis_angle(cls, axis, angle):
+        axis = np.array(axis).astype(np.float32)
+        axis /= np.linalg.norm(axis, axis=0)
+        angle = np.expand_dims(np.array(angle), 0).astype(np.float32)
 
         while len(axis.shape) < len(angle.shape):
             axis = np.expand_dims(axis, -1)
 
-        return cls(np.cos(angle / 2), *(axis * np.sin(angle / 2)))
+        return cls(np.cos(angle / 2 * np.pi / 180), *(axis * np.sin(angle / 2 * np.pi / 180)))
 
     @classmethod
     def x(cls, angle):
         axis = [1, 0, 0]
-        return cls.__from_axis_angle(axis, angle)
+        return cls.from_axis_angle(axis, angle)
 
     @classmethod
     def y(cls, angle):
         axis = [0, 1, 0]
-        return cls.__from_axis_angle(axis, angle)
+        return cls.from_axis_angle(axis, angle)
 
     @classmethod
     def z(cls, angle):
         axis = [0, 0, 1]
-        return cls.__from_axis_angle(axis, angle)
+        return cls.from_axis_angle(axis, angle)
 
     def __call__(self, r, alpha=1):
         return tuple(np.squeeze((self * type(self)(0, *r) * (~self)).u)), alpha
@@ -223,77 +224,32 @@ class Rotate(Transform):
             return super().__add__(other)
 
 
-class CorrectDR(Transform):
+class DiffRotate(Transform):
 
-    def __new__(cls, *args, **kwargs):
-        if len(args) == 4 and all(arg == 0 for arg in args):
-            return Pipe()
-        else:
-            return super().__new__(cls)
-
-    def __init__(self, A, B, C, jdn):
-        self.A = A
-        self.B = B
-        self.C = C
-        self.jdn = jdn
+    def __init__(self, time, func, **kwargs):
+        self.time = time
+        self.func = func
+        self.kwargs = kwargs
 
     def __repr__(self):
-        return f'CorrectDR(A:{self.A}, B:{self.B}, C:{self.C}, jdn:{self.jdn})'
+        return f'CorrectDR(jdn:{self.time})'
 
     def __call__(self, r, alpha=1):
-        x, y, z = r
+        W = self.func(r, **self.kwargs)
+        W_ = np.linalg.norm(W, axis=0)
+        angle = -W_ * self.time
 
-        W = self.A + self.B * y ** 2 + self.C * y ** 4
-        dphi = -W * self.jdn
-
-        rot = Rotate.y(dphi * np.pi / 180)
+        rot = Rotate.from_axis_angle(W, angle)
         return rot(r, alpha)
 
     def __invert__(self):
-        return type(self)(self.A, self.B, self.C, -self.jdn)
+        return type(self)(-self.time, self.func, **self.kwargs)
 
     def __add__(self, other):
         if isinstance(other, type(self)):
-            return type(self)(self.A, self.B, self.B, self.jdn + other.jdn)
+            return type(self)(self.time + other.time, self.func, **self.kwargs)
         else:
             return super().__add__(other)
-
-
-class GetTime(Transform):
-
-    def __new__(cls, *args, **kwargs):
-        if len(args) == 5 and all(arg == 0 for arg in args):
-            return Pipe()
-        else:
-            return super().__new__(cls)
-
-    def __init__(self, crln, A, B, C, Wsyn, inv=False):
-        self.crln = crln
-        self.A = A
-        self.B = B
-        self.C = C
-        self.Wsyn = Wsyn
-        self.inv = inv
-
-    def __repr__(self):
-        return f'GetTime(A:{self.A}, B:{self.B}, C:{self.C})'
-
-    def __call__(self, r, alpha=1):
-        if not self.inv:
-            x, y, z = r
-
-            W = self.A + self.B * y ** 2 + self.C * y ** 4 - self.Wsyn
-            a, b = np.cos(self.crln), np.sin(self.crln)
-            dphi = np.arctan2(a * x - b * z, a * z + b * x) * 180 / np.pi
-
-            return (x, y, z, dphi / W), alpha
-
-        else:
-            x, y, z, t = r
-            return (x, y, z), alpha
-
-    def __invert__(self):
-        return type(self)(self.crln, self.A, self.B, self.C, self.Wsyn, inv=not self.inv)
 
 
 class ToSynoptic(Transform):

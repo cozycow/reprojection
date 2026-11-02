@@ -199,7 +199,7 @@ class View:
                      Normalize((self.xc, self.yc), (self.rsun, self.rsun)) +
                      Make3d(self.rsun_arc / 3600, minmu=self.minmu))
 
-        transform += Rotate.z(self.crota * np.pi / 180)
+        transform += Rotate.z(self.crota)
         return transform
 
     def to_carrington(self, origin='image', correct_dr=False, stonyhurst=False, **kwargs):
@@ -213,11 +213,17 @@ class View:
 
         transform = (~self.get_transform(origin, **kwargs) +
                      self.to_heliographic(**kwargs) -
-                     Rotate.x(self.crlt * np.pi / 180) +
-                     Rotate.y(crln * np.pi / 180))
+                     Rotate.x(self.crlt) +
+                     Rotate.y(crln))
 
         if correct_dr:
-            transform += CorrectDR(A - WSID, B, C, self.jdn - tdel)
+            def diff_rot(r, *, a, b, c):
+                x, y, z = r
+                return np.zeros_like(x), a + b * y ** 2 + c * y ** 4, np.zeros_like(x)
+
+            transform += DiffRotate(self.jdn - tdel, diff_rot, a=A-WSID, b=B, c=C)
+
+            #transform += CorrectDR(A - WSID, B, C, self.jdn - tdel)
             #transform += ToSynoptic(crln0 * np.pi / 180, A, B, C, WSID, self.wsyn)
 
         return transform
@@ -268,7 +274,7 @@ class Map:
         return transform
 
     def reproject(self, image, view, **kwargs):
-        transform = self.to_carrington() - view.to_carrington(**kwargs)
+        transform = self.to_carrington(**kwargs) - view.to_carrington(**kwargs)
         grid_, alpha = transform(self.grid)
 
         image_ = map_coordinates(np.nan_to_num(image), grid_, cval=np.nan)
