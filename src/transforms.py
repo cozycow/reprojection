@@ -134,18 +134,17 @@ class Make3d(Transform):
                                      z > self.maxmu], axis=0))
                 x[t], y[t], z[t] = np.nan, np.nan, np.nan
             else:
-                if z < self.minmu:
+                if z < self.minmu or z > self.maxmu:
                     x, y = np.nan, np.nan
             return self.__paraxial((y, x, z)), alpha * z
         else:
             x, y, z = self.__paraxial(r)
-
             if isinstance(z, np.ndarray):
                 t = np.where(np.any([z < self.minmu,
                                      z > self.maxmu], axis=0))
                 x[t], y[t] = np.nan, np.nan
             else:
-                if z < self.minmu:
+                if z < self.minmu or z > self.maxmu:
                     x, y = np.nan, np.nan
 
             return (y, x), alpha / z
@@ -224,6 +223,79 @@ class Rotate(Transform):
             return super().__add__(other)
 
 
+class CorrectDR(Transform):
+
+    def __new__(cls, *args, **kwargs):
+        if len(args) == 4 and all(arg == 0 for arg in args):
+            return Pipe()
+        else:
+            return super().__new__(cls)
+
+    def __init__(self, A, B, C, jdn):
+        self.A = A
+        self.B = B
+        self.C = C
+        self.jdn = jdn
+
+    def __repr__(self):
+        return f'CorrectDR(A:{self.A}, B:{self.B}, C:{self.C}, jdn:{self.jdn})'
+
+    def __call__(self, r, alpha=1):
+        x, y, z = r
+
+        W = self.A + self.B * y ** 2 + self.C * y ** 4
+        dphi = -W * self.jdn
+
+        rot = Rotate.y(dphi * np.pi / 180)
+        return rot(r, alpha)
+
+    def __invert__(self):
+        return type(self)(self.A, self.B, self.C, -self.jdn)
+
+    def __add__(self, other):
+        if isinstance(other, type(self)):
+            return type(self)(self.A, self.B, self.B, self.jdn + other.jdn)
+        else:
+            return super().__add__(other)
+
+
+class GetTime(Transform):
+
+    def __new__(cls, *args, **kwargs):
+        if len(args) == 5 and all(arg == 0 for arg in args):
+            return Pipe()
+        else:
+            return super().__new__(cls)
+
+    def __init__(self, crln, A, B, C, Wsyn, inv=False):
+        self.crln = crln
+        self.A = A
+        self.B = B
+        self.C = C
+        self.Wsyn = Wsyn
+        self.inv = inv
+
+    def __repr__(self):
+        return f'GetTime(A:{self.A}, B:{self.B}, C:{self.C})'
+
+    def __call__(self, r, alpha=1):
+        if not self.inv:
+            x, y, z = r
+
+            W = self.A + self.B * y ** 2 + self.C * y ** 4 - self.Wsyn
+            a, b = np.cos(self.crln), np.sin(self.crln)
+            dphi = np.arctan2(a * x - b * z, a * z + b * x) * 180 / np.pi
+
+            return (x, y, z, dphi / W), alpha
+
+        else:
+            x, y, z, t = r
+            return (x, y, z), alpha
+
+    def __invert__(self):
+        return type(self)(self.crln, self.A, self.B, self.C, self.Wsyn, inv=not self.inv)
+
+
 class ToSynoptic(Transform):
 
     def __new__(cls, *args, **kwargs):
@@ -245,12 +317,14 @@ class ToSynoptic(Transform):
         return f'ToSynoptic(A:{self.A}, B:{self.B}, C:{self.C})'
 
     def __call__(self, r, alpha=1):
-        W = self.A + self.B * r[1] ** 2 + self.C * r[1] ** 4
+        x, y, z = r
+
+        W = self.A + self.B * y ** 2 + self.C * y ** 4
         Wobs = self.Wsid - self.Wsyn
         q = self.Wsyn / (W - Wobs)
 
         a, b = np.cos(self.crln), np.sin(self.crln)
-        dphi = np.arctan2(a * r[0] - b * r[2], a * r[2] + b * r[0])
+        dphi = np.arctan2(a * x - b * z, a * z + b * x)
 
         if self.inv:
             q = 1 / q

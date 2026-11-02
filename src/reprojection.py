@@ -3,10 +3,10 @@ from astropy.io import fits
 from view import View, Map
 
 
-def reproject(data, header, header_new=None, kind='synoptic',
+def reproject(data, header, header_new=None, kind='',
               correct_mu=True, **kwargs):
 
-    view = View.from_header(header)
+    view = View.from_header(header).update(minmu=0.1)
 
     if header_new is not None:
         view_new = View.from_header(header_new)
@@ -18,20 +18,20 @@ def reproject(data, header, header_new=None, kind='synoptic',
     elif kind == 'north':
         nx, ny = 1024, 1024
         xc, yc = (nx - 1) / 2, (ny - 1) / 2
-        Rsun = 0.45 * nx
-        view_new = View(nx, ny, xc, yc, Rsun, -90, 90, 0)
+        rsun = 0.45 * nx
+        view_new = View(nx, ny, xc, yc, rsun, -90, 90, 0)
 
     elif kind == 'south':
         nx, ny = 1024, 1024
         xc, yc = (nx - 1) / 2, (ny - 1) / 2
-        Rsun = 0.45 * nx
-        view_new = View(nx, ny, xc, yc, Rsun, 90, -90, 0)
+        rsun = 0.45 * nx
+        view_new = View(nx, ny, xc, yc, rsun, 90, -90, 0)
 
     elif kind == 'warp':
         nx, ny = 1024, 1024
         xc, yc = (nx - 1) / 2, (ny - 1) / 2
-        Rsun = 0.45 * nx
-        view_new = View(nx, ny, xc, yc, Rsun, 0, 0, 0, rsun_arc=-45 * 3600)
+        rsun = 0.45 * nx
+        view_new = View(nx, ny, xc, yc, rsun, 0, 0, 0, rsun_arc=-45 * 3600)
 
     else:
         view_new = view.copy()

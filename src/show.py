@@ -11,7 +11,7 @@ def show_data(data, view, title='', label=r'$B_{r}$, G', figsize=(10,10), cmap='
               grid_alpha=0.5, grid_color='black', text_alpha=1, text_color='black',
               to_file=None):
 
-    transform = ~(view.to_carrington(minmu=-1e-8) + ToSpherical())
+    transform = ~(view.update(minmu=-1e-8).to_carrington() + ToSpherical())
     data_ = data.copy()
 
     grid = np.mgrid[-90:90.5:1,0:360.5:1]

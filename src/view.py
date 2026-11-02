@@ -10,9 +10,22 @@ RSUN = 696e8
 A, B, C = 14.712, -2.396, -1.787  # differential rotation rates (Snodgrass & Ulrich, ApJ, 351, 309, 1990)
 
 
+def get_jdn(date):
+    from datetime import datetime
+
+    if isinstance(date, str):
+        return get_jdn(datetime.fromisoformat(date))
+
+    date0 = datetime(2000, 1, 1, 12, 0, 0)
+    jd0 = 2451545.
+
+    jd = jd0 + (date - date0).total_seconds() / 24 / 60 / 60
+    return jd
+
+
 class View:
     def __init__(self, nx, ny, xc, yc, rsun, crota, crlt, crln, hgln=0.,
-                 vr=0., vw=0., vn=0., rsun_arc=0., dsun=AU):
+                 vr=0., vw=0., vn=0., rsun_arc=0., dsun=AU, jdn=0., minmu=0.):
         '''
         A WCS information container.
         '''
@@ -31,6 +44,8 @@ class View:
         self.vn = vn
         self.rsun_arc = rsun_arc
         self.dsun = dsun
+        self.jdn = jdn
+        self.minmu = minmu
 
 
     def copy(self):
@@ -44,7 +59,7 @@ class View:
 
         for key, value in kwargs.items():
             if key in ['nx', 'ny', 'xc', 'yc', 'rsun', 'crota', 'crlt', 'crln', 'hgln',
-                       'vr', 'vw', 'vn', 'rsun_arc', 'dsun']:
+                       'vr', 'vw', 'vn', 'rsun_arc', 'dsun', 'jdn', 'minmu']:
                 if increment:
                     setattr(view_new, key, getattr(self, key) + value)
                 elif multiply:
@@ -114,7 +129,12 @@ class View:
         else:
             dsun = AU
 
-        return cls(nx, ny, xc, yc, rsun, crota, crlt, crln, hgln, vr, vw, vn, rsun_arc, dsun)
+        if 'DATE-OBS' in header:
+            jdn = get_jdn(header['DATE-OBS'])
+        else:
+            jdn = 0.
+
+        return cls(nx, ny, xc, yc, rsun, crota, crlt, crln, hgln, vr, vw, vn, rsun_arc, dsun, jdn, 0.)
 
 
     def update_header(self, header, inplace=False):
@@ -174,17 +194,17 @@ class View:
     def get_transform(self, name='image', **kwargs):
         return getattr(self, 'to_' + name, Pipe)(**kwargs)
 
-    def to_heliographic(self, minmu=0, maxmu=1, origin='image', **kwargs):
+    def to_heliographic(self, origin='image', **kwargs):
         transform = (~self.get_transform(origin, **kwargs) +
                      Normalize((self.xc, self.yc), (self.rsun, self.rsun)) +
-                     Make3d(self.rsun_arc / 3600, minmu=minmu, maxmu=maxmu))
+                     Make3d(self.rsun_arc / 3600, minmu=self.minmu))
 
         transform += Rotate.z(self.crota * np.pi / 180)
         return transform
 
-    def to_carrington(self, origin='image', correct_dr=False, delta_t=1, stonyhurst=False, **kwargs):
-        tdel = (AU - self.dsun) / CLIGHT
-        crln = self.crln + tdel * WSID / 24 / 3600
+    def to_carrington(self, origin='image', correct_dr=False, stonyhurst=False, **kwargs):
+        tdel = (AU - self.dsun) / CLIGHT / 24 / 3600
+        crln = self.crln + tdel * WSID
 
         if stonyhurst:
             crln0 = crln - self.hgln
@@ -197,19 +217,13 @@ class View:
                      Rotate.y(crln * np.pi / 180))
 
         if correct_dr:
-            transform += ToSynoptic(crln0 * np.pi / 180, A, B, C, WSID, self.wsyn)
+            transform += CorrectDR(A - WSID, B, C, self.jdn - tdel)
+            #transform += ToSynoptic(crln0 * np.pi / 180, A, B, C, WSID, self.wsyn)
 
-        if False:#correct_dr:
-            #clip_filter = Filter(lambda r: np.abs((r[1] - crln + 180) % 360 - 180) / self.wsyn < delta_t)
-
-            transform += (ToSpherical() +
-                          ToSynoptic1(crln0, A, B, C, WSID, self.wsyn) -
-                          #clip_filter -
-                          ToSpherical())
         return transform
 
     def reproject(self, image, view, **kwargs):
-        transform = self.to_carrington() - view.to_carrington(**kwargs)
+        transform = self.to_carrington(**kwargs) - view.to_carrington(**kwargs)
         grid_, alpha = transform(self.grid)
 
         image_ = map_coordinates(np.nan_to_num(image), grid_, cval=np.nan)
