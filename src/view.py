@@ -23,6 +23,23 @@ def get_jdn(date):
     return jd
 
 
+def diff_rot(r, *, a, b, c):
+    x, y, z = r
+    return np.zeros_like(x), a + b * y ** 2 + c * y ** 4, np.zeros_like(x)
+
+
+def diff_rot1(r, *, a, b, c, crln, wsyn):
+    x, y, z = r
+
+    w = a + b * y ** 2 + c * y ** 4
+
+    u, v = np.cos(crln * np.pi / 180), np.sin(crln * np.pi / 180)
+    phi = np.arctan2(u * x - v * z, u * z + v * x) * 180 / np.pi
+    t = phi / wsyn
+
+    return np.zeros_like(x), t * w, np.zeros_like(x)
+
+
 class View:
     def __init__(self, nx, ny, xc, yc, rsun, crota, crlt, crln, hgln=0.,
                  vr=0., vw=0., vn=0., rsun_arc=0., dsun=AU, jdn=0., minmu=0.):
@@ -217,14 +234,10 @@ class View:
                      Rotate.y(crln))
 
         if correct_dr:
-            def diff_rot(r, *, a, b, c):
-                x, y, z = r
-                return np.zeros_like(x), a + b * y ** 2 + c * y ** 4, np.zeros_like(x)
+
 
             transform += DiffRotate(self.jdn - tdel, diff_rot, a=A-WSID, b=B, c=C)
-
-            #transform += CorrectDR(A - WSID, B, C, self.jdn - tdel)
-            #transform += ToSynoptic(crln0 * np.pi / 180, A, B, C, WSID, self.wsyn)
+            transform += DiffRotate(1, diff_rot1, a=A-WSID, b=B, c=C, crln=crln0, wsyn=self.wsyn)
 
         return transform
 

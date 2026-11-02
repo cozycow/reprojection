@@ -156,7 +156,8 @@ class Make3d(Transform):
 class Rotate(Transform):
 
     def __new__(cls, *args, **kwargs):
-        if not isinstance(args[0], np.ndarray) and args[0] == 1:
+        #if not isinstance(args[0], np.ndarray) and args[0] == 1.:
+        if np.all(np.array(args[0]) - 1 == 0.):
             return Pipe()
         else:
             return super().__new__(cls)
@@ -177,7 +178,7 @@ class Rotate(Transform):
         return float(2 * np.arctan2(q, self.w) * 180 / np.pi)
 
     def __repr__(self):
-        return f'Rotate(axis:{self.axis}, angle:{self.angle})'
+        return f'Rotate(axis:, angle:)'
 
     def __mul__(self, other):
         return type(self)(self.w * other.w - sum(x * y for x, y in zip(self.u, other.u)),
@@ -191,7 +192,7 @@ class Rotate(Transform):
     @classmethod
     def from_axis_angle(cls, axis, angle):
         axis = np.array(axis).astype(np.float32)
-        axis /= np.linalg.norm(axis, axis=0)
+        axis /= np.linalg.norm(axis, axis=0) + 1e-16
         angle = np.expand_dims(np.array(angle), 0).astype(np.float32)
 
         while len(axis.shape) < len(angle.shape):
@@ -226,6 +227,12 @@ class Rotate(Transform):
 
 class DiffRotate(Transform):
 
+    def __new__(cls, *args, **kwargs):
+        if args[0] == 0.:
+            return Pipe()
+        else:
+            return super().__new__(cls)
+
     def __init__(self, time, func, **kwargs):
         self.time = time
         self.func = func
@@ -246,50 +253,11 @@ class DiffRotate(Transform):
         return type(self)(-self.time, self.func, **self.kwargs)
 
     def __add__(self, other):
-        if isinstance(other, type(self)):
+        if (isinstance(other, type(self)) and (self.func == other.func) and
+            all(self.kwargs[key] == other.kwargs[key] for key in self.kwargs.keys())):
             return type(self)(self.time + other.time, self.func, **self.kwargs)
         else:
             return super().__add__(other)
-
-
-class ToSynoptic(Transform):
-
-    def __new__(cls, *args, **kwargs):
-        if len(args) == 5 and all(arg == 0 for arg in args):
-            return Pipe()
-        else:
-            return super().__new__(cls)
-
-    def __init__(self, crln, A, B, C, Wsid, Wsyn, inv=False):
-        self.crln = crln
-        self.A = A
-        self.B = B
-        self.C = C
-        self.Wsid = Wsid
-        self.Wsyn = Wsyn
-        self.inv = inv
-
-    def __repr__(self):
-        return f'ToSynoptic(A:{self.A}, B:{self.B}, C:{self.C})'
-
-    def __call__(self, r, alpha=1):
-        x, y, z = r
-
-        W = self.A + self.B * y ** 2 + self.C * y ** 4
-        Wobs = self.Wsid - self.Wsyn
-        q = self.Wsyn / (W - Wobs)
-
-        a, b = np.cos(self.crln), np.sin(self.crln)
-        dphi = np.arctan2(a * x - b * z, a * z + b * x)
-
-        if self.inv:
-            q = 1 / q
-
-        rot = Rotate.y(dphi * (q - 1))
-        return rot(r, alpha)
-
-    def __invert__(self):
-        return type(self)(self.crln, A=self.A, B=self.B, C=self.C, Wsid=self.Wsid, Wsyn=self.Wsyn, inv=not self.inv)
 
 
 class ToSpherical(Transform):
@@ -341,17 +309,18 @@ class Filter(Transform):
 
 class Custom(Transform):
 
-    def __init__(self, func, func_inv, **kwargs):
+    def __init__(self, func, func_inv, *args, **kwargs):
         self.func = func
         self.func_inv = func_inv
-        self.params = kwargs
+        self.args = args
+        self.kwargs = kwargs
 
     def __repr__(self):
         return f'Custom({self.func.__repr__()}, {self.func_inv.__repr__()})'
 
     def __call__(self, r, alpha=1):
-        return self.func(r, alpha, **self.params)
+        return self.func(r, alpha, *self.args, **self.kwargs)
 
     def __invert__(self):
-        return type(self)(self.func_inv, self.func, **self.params)
+        return type(self)(self.func_inv, self.func, *self.args, **self.kwargs)
 
