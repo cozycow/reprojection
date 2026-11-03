@@ -7,7 +7,7 @@ from transforms import ToSpherical
 from view import View
 
 
-def show_data(data, view, title='', label=r'$B_{r}$, G', figsize=(10,10), cmap='hmimag', vmin=-200, vmax=200,
+def show_data(data, view, title='', label=r'$B_{los}$, G', figsize=(10,10), cmap='hmimag', vmin=-200, vmax=200,
               grid_alpha=0.5, grid_color='black', text_alpha=1, text_color='black',
               to_file=None):
 

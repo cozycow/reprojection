@@ -244,7 +244,7 @@ class DiffRotate(Transform):
     def __call__(self, r, alpha=1):
         W = self.func(r, **self.kwargs)
         W_ = np.linalg.norm(W, axis=0)
-        angle = -W_ * self.time
+        angle = W_ * self.time
 
         rot = Rotate.from_axis_angle(W, angle)
         return rot(r, alpha)
