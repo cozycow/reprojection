@@ -4,9 +4,10 @@ from view import View, Map
 
 
 def reproject(data, header, header_new=None, kind='',
-              correct_mu=True, **kwargs):
+              correct_mu=True, mu_thr=0.,
+              **kwargs):
 
-    view = View.from_header(header).update(minmu=0.1)
+    view = View.from_header(header).update(minmu=mu_thr)
 
     if header_new is not None:
         view_new = View.from_header(header_new)
@@ -31,7 +32,7 @@ def reproject(data, header, header_new=None, kind='',
         nx, ny = 1024, 1024
         xc, yc = (nx - 1) / 2, (ny - 1) / 2
         rsun = 0.45 * nx
-        view_new = View(nx, ny, xc, yc, rsun, 0, 0, 0, rsun_arc=-45 * 3600, vw=np.inf, jdn=view.jdn)
+        view_new = View(nx, ny, xc, yc, rsun, 0, 0, 90, rsun_arc=-45 * 3600, vw=np.inf, jdn=view.jdn)
 
     else:
         view_new = view.copy()

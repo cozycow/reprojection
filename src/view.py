@@ -28,7 +28,7 @@ def diff_rot(r, *, a, b, c):
     return np.zeros_like(x), a + b * y ** 2 + c * y ** 4, np.zeros_like(x)
 
 
-def diff_rot1(r, *, a, b, c, crln, wsyn):
+def diff_rot1(r, *, a, b, c, crln, wsid, wsyn):
     x, y, z = r
 
     w = a + b * y ** 2 + c * y ** 4
@@ -36,8 +36,17 @@ def diff_rot1(r, *, a, b, c, crln, wsyn):
     u, v = np.cos(crln * np.pi / 180), np.sin(crln * np.pi / 180)
     phi = np.arctan2(u * x - v * z, u * z + v * x) * 180 / np.pi
     t = phi / wsyn
+    t[np.abs(t) > 10] = np.nan
 
-    return np.zeros_like(x), t * w, np.zeros_like(x)
+    return np.zeros_like(x), t * (w - wsid), np.zeros_like(x)
+
+
+def dot(x, y):
+    return x[0] * y[0] + x[1] * y[1] + x[2] * y[2]
+
+
+def cross(x, y):
+    return x[1] * y[2] - x[2] * y[1], x[2] * y[0] - x[0] * y[2], x[0] * y[1] - x[1] * y[0]
 
 
 class View:
@@ -233,11 +242,32 @@ class View:
                      Rotate.x(self.crlt) +
                      Rotate.y(crln))
 
+        def diff_rot2(r, *, a, b, c, robs, wobs, wsid):
+
+            wsyn = (wobs[0], wobs[1] - wsid, wobs[2])
+            wsyn_ = np.sqrt(dot(wsyn, wsyn))
+
+            r1 = cross(wsyn, cross(r, (0,1,0)))
+            r1_ = np.sqrt(dot(r1, r1))
+
+            phi = np.arcsin(dot(cross(robs, r1), wsyn) / wsyn_ / r1_) * 180 / np.pi
+            t = np.nan_to_num(phi / wsyn_)
+
+            w = diff_rot(r, a=a, b=b, c=c)
+            return w[0] * t, (w[1] - wsid) * t, w[2] * t
+
+        rot = ~Rotate.x(self.crlt) + Rotate.y(crln)
+        robs = rot((0, 0, 1))[0]
+        wobs = rot((-self.vn / self.dsun / np.pi * 180 * 24 * 60 * 60,
+                    self.vw / self.dsun / np.pi * 180 * 24 * 60 * 60, 0.))[0]
+
+        #print(robs, wobs)
+
+
         if correct_dr:
-
-
-            transform += DiffRotate(self.jdn - tdel, diff_rot, a=A-WSID, b=B, c=C)
-            transform += DiffRotate(1, diff_rot1, a=A-WSID, b=B, c=C, crln=crln0, wsyn=self.wsyn)
+            #transform += DiffRotate(self.jdn - tdel, diff_rot, a=A-WSID, b=B, c=C)
+            #transform += DiffRotate(1, diff_rot1, a=A, b=B, c=C, crln=crln0, wsid=WSID, wsyn=self.wsyn)
+            transform += DiffRotate(1, diff_rot2, a=A, b=B, c=C, robs=robs, wobs=wobs, wsid=WSID)
 
         return transform
 
