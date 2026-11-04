@@ -25,18 +25,24 @@ def get_jdn(date):
 
 def diff_rot(r, *, a, b, c):
     x, y, z = r
-    return np.zeros_like(x), a + b * y ** 2 + c * y ** 4, np.zeros_like(x)
+    return 0, a + b * y ** 2 + c * y ** 4, 0
+
+
+def diff_rot2_(r, *, a, b, c, robs, wobs, wsid):
+    wsyn = wobs[1] - wsid
+
+    phi = np.arctan2(r[2] * robs[0] - r[0] * robs[2], r[0] * robs[0] + r[2] * robs[2]) * 180 / np.pi
+    t = np.nan_to_num(phi / wsyn)
+
+    w = diff_rot(r, a=a, b=b, c=c)
+    return w[0] * t, (w[1] - wsid) * t, w[2] * t
 
 
 def diff_rot2(r, *, a, b, c, robs, wobs, wsid):
-    wsyn = (wobs[0], wobs[1] - wsid, wobs[2])
-    wsyn_ = np.sqrt(dot(wsyn, wsyn))
+    wsyn = wobs[1] - wsid
 
-    r1 = cross(wsyn, cross(r, (0, 1, 0)))
-    r1_ = np.sqrt(dot(r1, r1))
-
-    phi = np.arcsin(dot(cross(robs, r1), wsyn) / wsyn_ / r1_) * 180 / np.pi
-    t = np.nan_to_num(phi / wsyn_)
+    phi = np.arctan2(r[2] * robs[0] - r[0] * robs[2], r[0] * robs[0] + r[2] * robs[2]) * 180 / np.pi
+    t = np.nan_to_num(phi / wsyn)
 
     w = diff_rot(r, a=a, b=b, c=c)
     return w[0] * t, (w[1] - wsid) * t, w[2] * t
