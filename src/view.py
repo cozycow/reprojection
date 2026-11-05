@@ -1,13 +1,13 @@
 import numpy as np
 from scipy.ndimage import map_coordinates
 from transforms import *
+from diff_rot import *
 
 
 WSID = 360 / 25.38
 AU = 149597870691.
 CLIGHT = 299792458
 RSUN = 696e8
-A, B, C = 14.712, -2.396, -1.787  # differential rotation rates (Snodgrass & Ulrich, ApJ, 351, 309, 1990)
 
 
 def get_jdn(date):
@@ -21,39 +21,6 @@ def get_jdn(date):
 
     jd = jd0 + (date - date0).total_seconds() / 24 / 60 / 60
     return jd
-
-
-def diff_rot(r, *, a, b, c):
-    x, y, z = r
-    return 0, a + b * y ** 2 + c * y ** 4, 0
-
-
-def diff_rot2_(r, *, a, b, c, robs, wobs, wsid):
-    wsyn = wobs[1] - wsid
-
-    phi = np.arctan2(r[2] * robs[0] - r[0] * robs[2], r[0] * robs[0] + r[2] * robs[2]) * 180 / np.pi
-    t = np.nan_to_num(phi / wsyn)
-
-    w = diff_rot(r, a=a, b=b, c=c)
-    return w[0] * t, (w[1] - wsid) * t, w[2] * t
-
-
-def diff_rot2(r, *, a, b, c, robs, wobs, wsid):
-    wsyn = wobs[1] - wsid
-
-    phi = np.arctan2(r[2] * robs[0] - r[0] * robs[2], r[0] * robs[0] + r[2] * robs[2]) * 180 / np.pi
-    t = np.nan_to_num(phi / wsyn)
-
-    w = diff_rot(r, a=a, b=b, c=c)
-    return w[0] * t, (w[1] - wsid) * t, w[2] * t
-
-
-def dot(x, y):
-    return x[0] * y[0] + x[1] * y[1] + x[2] * y[2]
-
-
-def cross(x, y):
-    return x[1] * y[2] - x[2] * y[1], x[2] * y[0] - x[0] * y[2], x[0] * y[1] - x[1] * y[0]
 
 
 class View:
@@ -250,8 +217,14 @@ class View:
                         self.vw / self.dsun / np.pi * 180 * 24 * 60 * 60,
                         0.))[0]
 
-            #transform -= DiffRotate(self.jdn - tdel, diff_rot, a=A-WSID, b=B, c=C)
-            transform -= DiffRotate(1, diff_rot2, a=A, b=B, c=C, robs=robs, wobs=wobs, wsid=WSID)
+
+            transform -= DiffRotate(1, diff_rot2_, robs=robs, wobs=wobs, wsid=WSID)
+
+
+            #transform -= DiffRotate(self.jdn - tdel, diff_rot)
+            #transform -= DiffRotate(1, diff_rot2,
+            #                        dsun_obs=self.dsun, obs_vn=self.vn, obs_vw=self.vw, obs_vr=self.vr,
+            #                        crln_obs=crln, crlt_obs=self.crlt)
 
         return transform
 
