@@ -183,10 +183,6 @@ class View:
         return header_new
 
     @property
-    def wsyn(self):
-        return WSID - self.vw / self.dsun / np.cos(self.crlt * np.pi / 180) / np.pi * 180 * 24 * 60 * 60
-
-    @property
     def grid(self):
         grid = tuple(np.mgrid[:self.nx, :self.ny].astype(np.float32))
         return grid
@@ -197,8 +193,15 @@ class View:
     def to_heliographic(self, origin='image', **kwargs):
         transform = (~self.get_transform(origin, **kwargs) +
                      Normalize((self.xc, self.yc), (self.rsun, self.rsun)) +
-                     Make3d(self.rsun_arc / 3600, minmu=self.minmu))
+                     Make3d(self.rsun_arc / 3600))
 
+        def mu_filter(r, minmu=0.):
+            x, y, z = r
+            t = np.where(z < minmu)
+            x[t], y[t], z[t] = np.nan, np.nan, np.nan
+            return z
+
+        transform += Filter(mu_filter, minmu=self.minmu)
         transform += Rotate.z(self.crota)
         return transform
 
@@ -212,19 +215,10 @@ class View:
                      rot)
 
         if correct_dr:
-            robs = rot((0, 0, 1))[0]
-            wobs = rot((-self.vn / self.dsun / np.pi * 180 * 24 * 60 * 60,
-                        self.vw / self.dsun / np.pi * 180 * 24 * 60 * 60,
-                        0.))[0]
-
-
-            transform -= DiffRotate(1, diff_rot2_, robs=robs, wobs=wobs, wsid=WSID)
-
-
             #transform -= DiffRotate(self.jdn - tdel, diff_rot)
-            #transform -= DiffRotate(1, diff_rot2,
-            #                        dsun_obs=self.dsun, obs_vn=self.vn, obs_vw=self.vw, obs_vr=self.vr,
-            #                        crln_obs=crln, crlt_obs=self.crlt)
+            transform -= DiffRotate(1, diff_rot2,
+                                    dsun_obs=self.dsun, obs_vn=self.vn, obs_vw=self.vw, obs_vr=self.vr,
+                                    crln_obs=crln, crlt_obs=self.crlt)
 
         return transform
 
