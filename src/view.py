@@ -193,16 +193,18 @@ class View:
 
     def to_heliographic(self, origin='image', **kwargs):
 
-        def mu_filter(r, minmu=0.):
+        def mu_filter(r, minmu=0., theta=0.):
             x, y, z = r
-            t = np.where(z < minmu)
+            q = np.sin(theta * np.pi / 180)
+            mu = (z - q) / np.sqrt(q ** 2 - 2 * q * z + 1)
+            t = np.where(mu < minmu)
             x[t], y[t], z[t] = np.nan, np.nan, np.nan
-            return z
+            return mu
 
         transform = (~self.get_transform(origin, **kwargs) +
                      Normalize((self.xc, self.yc), (self.rsun, self.rsun)) +
                      Make3d(self.rsun_arc / 3600) +
-                     Filter(mu_filter, self.powmu, minmu=self.minmu) +
+                     Filter(mu_filter, self.powmu, minmu=self.minmu, theta=self.rsun_arc / 3600) +
                      Rotate.z(self.crota))
 
         return transform

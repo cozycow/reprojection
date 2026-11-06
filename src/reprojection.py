@@ -20,19 +20,22 @@ def reproject(data, header, header_new=None, kind='',
         nx, ny = 1024, 1024
         xc, yc = (nx - 1) / 2, (ny - 1) / 2
         rsun = 0.45 * nx
-        view_new = View(nx, ny, xc, yc, rsun, -90, 90, 0, vw=np.inf, jdn=view.jdn, powmu=1.)
+        view_new = View(nx, ny, xc, yc, rsun, -90, 90, 0,
+                        vw=np.inf, jdn=view.jdn, powmu=1.)
 
     elif kind == 'south':
         nx, ny = 1024, 1024
         xc, yc = (nx - 1) / 2, (ny - 1) / 2
         rsun = 0.45 * nx
-        view_new = View(nx, ny, xc, yc, rsun, 90, -90, 0, vw=np.inf, jdn=view.jdn, powmu=1.)
+        view_new = View(nx, ny, xc, yc, rsun, 90, -90, 0,
+                        vw=np.inf, jdn=view.jdn, powmu=1.)
 
     elif kind == 'warp':
         nx, ny = 1024, 1024
         xc, yc = (nx - 1) / 2, (ny - 1) / 2
         rsun = 0.45 * nx
-        view_new = View(nx, ny, xc, yc, rsun, 0, 0, 90, rsun_arc=-45 * 3600, vw=np.inf, jdn=view.jdn)
+        view_new = View(nx, ny, xc, yc, rsun, 0, 0, 90,
+                        rsun_arc=-45 * 3600, vw=np.inf, jdn=view.jdn, powmu=1.)
 
     else:
         view_new = view.copy()
