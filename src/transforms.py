@@ -108,14 +108,11 @@ class Normalize(Transform):
 
 class Make3d(Transform):
 
-    def __init__(self, theta, minmu=0, maxmu=np.inf, inv=False):
+    def __init__(self, theta):
         self.theta = theta
-        self.minmu = minmu
-        self.maxmu = maxmu
-        self.inv = inv
 
     def __repr__(self):
-        return f'Make3d(theta:{self.theta}, inv:{self.inv})'
+        return f'Make3d(theta:{self.theta})'
 
     def __paraxial(self, r):
         x, y, z = r
@@ -130,31 +127,19 @@ class Make3d(Transform):
         return x, y, z
 
     def __call__(self, r, alpha=1):
-        if not self.inv:
-            x, y = r
+        if len(r) == 2:
+            y, x = r
             z = np.sqrt(1 - x ** 2 - y ** 2)
-            if isinstance(z, np.ndarray):
-                t = np.where(np.any([z < self.minmu,
-                                     z > self.maxmu], axis=0))
-                x[t], y[t], z[t] = np.nan, np.nan, np.nan
-            else:
-                if z < self.minmu or z > self.maxmu:
-                    x, y = np.nan, np.nan
-            return self.__paraxial((y, x, z)), alpha * z
+            return self.__paraxial((x, y, z)), alpha
         else:
             x, y, z = self.__paraxial(r)
-            if isinstance(z, np.ndarray):
-                t = np.where(np.any([z < self.minmu,
-                                     z > self.maxmu], axis=0))
-                x[t], y[t] = np.nan, np.nan
-            else:
-                if z < self.minmu or z > self.maxmu:
-                    x, y = np.nan, np.nan
 
-            return (y, x), alpha / z
+            t = np.where(z < -1e-8)
+            x[t], y[t] = np.nan, np.nan
+            return (y, x), alpha
 
     def __invert__(self):
-        return type(self)(-self.theta, self.minmu, self.maxmu, not self.inv)
+        return type(self)(-self.theta)
 
 
 class Rotate(Transform):
@@ -293,22 +278,20 @@ class ToSpherical(Transform):
 
 class Filter(Transform):
 
-    def __init__(self, func, inv=False, **kwargs):
+    def __init__(self, func, pow=1, **kwargs):
         self.func = func
-        self.inv = inv
+        self.pow = pow
         self.kwargs = kwargs
 
     def __repr__(self):
-        return f'Filter(func:{self.func}, inv:{self.inv})'
+        return f'Filter(func:{self.func}, inv:{self.pow})'
 
     def __call__(self, r, alpha=1):
-        if not self.inv:
-            return r, alpha * self.func(r, **self.kwargs)
-        else:
-            return r, alpha / self.func(r, **self.kwargs)
+        return r, alpha * self.func(r, **self.kwargs) ** self.pow
+
 
     def __invert__(self):
-        return type(self)(self.func, not self.inv, **self.kwargs)
+        return type(self)(self.func, -self.pow, **self.kwargs)
 
 
 class Custom(Transform):

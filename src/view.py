@@ -25,7 +25,7 @@ def get_jdn(date):
 
 class View:
     def __init__(self, nx, ny, xc, yc, rsun, crota, crlt, crln, hgln=0.,
-                 vr=0., vw=0., vn=0., rsun_arc=0., dsun=AU, jdn=0., minmu=0.):
+                 vr=0., vw=0., vn=0., rsun_arc=0., dsun=AU, jdn=0., minmu=-np.inf, powmu=0.):
         '''
         A WCS information container.
         '''
@@ -46,6 +46,7 @@ class View:
         self.dsun = dsun
         self.jdn = jdn
         self.minmu = minmu
+        self.powmu = powmu
 
 
     def copy(self):
@@ -59,7 +60,7 @@ class View:
 
         for key, value in kwargs.items():
             if key in ['nx', 'ny', 'xc', 'yc', 'rsun', 'crota', 'crlt', 'crln', 'hgln',
-                       'vr', 'vw', 'vn', 'rsun_arc', 'dsun', 'jdn', 'minmu']:
+                       'vr', 'vw', 'vn', 'rsun_arc', 'dsun', 'jdn', 'minmu', 'powmu']:
                 if increment:
                     setattr(view_new, key, getattr(self, key) + value)
                 elif multiply:
@@ -134,7 +135,7 @@ class View:
         else:
             jdn = 0.
 
-        return cls(nx, ny, xc, yc, rsun, crota, crlt, crln, hgln, vr, vw, vn, rsun_arc, dsun, jdn, 0.)
+        return cls(nx, ny, xc, yc, rsun, crota, crlt, crln, hgln, vr, vw, vn, rsun_arc, dsun, jdn, 0., 1.)
 
 
     def update_header(self, header, inplace=False):
@@ -191,11 +192,19 @@ class View:
         return getattr(self, 'to_' + name, Pipe)(**kwargs)
 
     def to_heliographic(self, origin='image', **kwargs):
+
+        def mu_filter(r, minmu=0.):
+            x, y, z = r
+            t = np.where(z < minmu)
+            x[t], y[t], z[t] = np.nan, np.nan, np.nan
+            return z
+
         transform = (~self.get_transform(origin, **kwargs) +
                      Normalize((self.xc, self.yc), (self.rsun, self.rsun)) +
-                     Make3d(self.rsun_arc / 3600, minmu=self.minmu))
+                     Make3d(self.rsun_arc / 3600) +
+                     Filter(mu_filter, self.powmu, minmu=self.minmu) +
+                     Rotate.z(self.crota))
 
-        transform += Rotate.z(self.crota)
         return transform
 
     def to_carrington(self, origin='image', correct_dr=False, **kwargs):

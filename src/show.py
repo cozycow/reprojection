@@ -10,7 +10,7 @@ def show_data(data, view, title='', label=r'$B_{los}$, G', figsize=(10,10), cmap
               grid_alpha=0.5, grid_color='black', text_alpha=1, text_color='black',
               to_file=None):
 
-    transform = ~(view.update(minmu=-1e-8).to_carrington() + ToSpherical())
+    transform = ~(view.to_carrington() + ToSpherical())
     data_ = data.copy()
 
     grid = np.mgrid[-90:90.5:1,0:360.5:1]
@@ -57,6 +57,8 @@ def show_data(data, view, title='', label=r'$B_{los}$, G', figsize=(10,10), cmap
         plt.savefig(to_file)
         plt.ion()
         plt.close(fig)
+    else:
+        return fig, ax
 
 
 def show_map(data, map, figsize=(15,8), label=r'$B_{r}$, G', cmap='hmimag', vmin=-50, vmax=50, **kwargs):

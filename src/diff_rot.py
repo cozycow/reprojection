@@ -16,16 +16,6 @@ def diff_rot2(r, *, dsun_obs, obs_vn, obs_vw, obs_vr, crln_obs, crlt_obs, a=A-WS
     return w[0] * time, w[1] * time, w[2] * time
 
 
-def diff_rot2_(r, *, robs, wobs, wsid, a=A-WSID, b=B, c=C):
-    wsyn = wobs[1] - wsid
-
-    phi = np.arctan2(r[2] * robs[0] - r[0] * robs[2], r[0] * robs[0] + r[2] * robs[2]) * 180 / np.pi
-    t = np.nan_to_num(phi / wsyn)
-
-    w = diff_rot(r, a=a, b=b, c=c)
-    return w[0] * t, w[1] * t, w[2] * t
-
-
 def diff_rot(r, *, a=A-WSID, b=B, c=C):
     x, y, z = r
     return 0, a + b * y ** 2 + c * y ** 4, 0
