@@ -108,8 +108,10 @@ class Normalize(Transform):
 
 class Make3d(Transform):
 
-    def __init__(self, theta, inv=False):
+    def __init__(self, theta, minmu=0, maxmu=1, inv=False):
         self.theta = theta
+        self.minmu = minmu
+        self.maxmu = maxmu
         self.inv = inv
 
     def __repr__(self):
@@ -127,13 +129,28 @@ class Make3d(Transform):
         if not self.inv:
             x, y = r
             z = np.sqrt(1 - x ** 2 - y ** 2)
-            return self.__paraxial((y, x, z)), alpha
+            if isinstance(z, np.ndarray):
+                t = np.where(np.any([z < self.minmu,
+                                     z > self.maxmu], axis=0))
+                x[t], y[t], z[t] = np.nan, np.nan, np.nan
+            else:
+                if z < self.minmu or z > self.maxmu:
+                    x, y = np.nan, np.nan
+            return self.__paraxial((y, x, z)), alpha * z
         else:
             x, y, z = self.__paraxial(r)
-            return (y, x), alpha
+            if isinstance(z, np.ndarray):
+                t = np.where(np.any([z < self.minmu,
+                                     z > self.maxmu], axis=0))
+                x[t], y[t] = np.nan, np.nan
+            else:
+                if z < self.minmu or z > self.maxmu:
+                    x, y = np.nan, np.nan
+
+            return (y, x), alpha / z
 
     def __invert__(self):
-        return type(self)(-self.theta, not self.inv)
+        return type(self)(-self.theta, self.minmu, self.maxmu, not self.inv)
 
 
 class Rotate(Transform):
