@@ -108,7 +108,7 @@ class Normalize(Transform):
 
 class Make3d(Transform):
 
-    def __init__(self, theta, minmu=0, maxmu=1, inv=False):
+    def __init__(self, theta, minmu=0, maxmu=np.inf, inv=False):
         self.theta = theta
         self.minmu = minmu
         self.maxmu = maxmu
@@ -119,10 +119,14 @@ class Make3d(Transform):
 
     def __paraxial(self, r):
         x, y, z = r
+        a = np.sqrt(x ** 2 + y ** 2 + z ** 2)
+
         q = np.sin(self.theta * np.pi / 180)
-        u = np.sqrt(1 - q ** 2) / (1 + q * z)
+        p = a / (a + q * z)
+
+        u = np.sqrt(1 - q ** 2) * p
         x, y = x * u, y * u
-        z = (z + q) / (1 + q * z)
+        z = (z + q * a) * p
         return x, y, z
 
     def __call__(self, r, alpha=1):

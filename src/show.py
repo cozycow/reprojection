@@ -3,8 +3,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 import sunpy.visualization.colormaps as cm
 from matplotlib import colormaps
-from transforms import ToSpherical
-from view import View
+from transforms import ToSpherical, Normalize
 
 
 def show_data(data, view, title='', label=r'$B_{los}$, G', figsize=(10,10), cmap='hmimag', vmin=-200, vmax=200,

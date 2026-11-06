@@ -195,11 +195,6 @@ class View:
                      Normalize((self.xc, self.yc), (self.rsun, self.rsun)) +
                      Make3d(self.rsun_arc / 3600, minmu=self.minmu))
 
-        def mu_filter(r):
-            x, y, z = r
-            return 1 / z
-
-        #transform += Filter(mu_filter)
         transform += Rotate.z(self.crota)
         return transform
 
