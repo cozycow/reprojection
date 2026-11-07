@@ -214,7 +214,8 @@ class View(ViewBase):
             return mu
 
         transform = (Normalize((self.xc, self.yc), (self.rsun, self.rsun)) +
-                     Make3d(self.rsun_deg) +
+                     To3d() +
+                     ToParaxial(self.rsun_deg) +
                      Filter(mu_filter, self.powmu, minmu=self.minmu, theta=self.rsun_deg) +
                      Rotate.z(self.crota))
 
