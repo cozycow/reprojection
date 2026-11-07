@@ -271,7 +271,10 @@ class ToParaxial(Transform):
 
     def __add__(self, other):
         if isinstance(other, type(self)):
-            return type(self)(self.theta + other.theta)
+            q1 = np.sin(self.theta * np.pi / 180)
+            q2 = np.sin(other.theta * np.pi / 180)
+            theta = np.arcsin((q1 + q2) / (1 + q1 * q2)) * 180 / np.pi
+            return type(self)(theta)
         else:
             return super().__add__(other)
 
