@@ -28,7 +28,7 @@ def remap(data, header, nx=720, ny=1800, sine_lat=False,
     from transforms import ToSpherical
 
     view = View.from_header(header).update(**kwargs)
-    transform = ~ToSpherical() - view.to_carrington(**kwargs)
+    transform = ~ToSpherical() - view.transform(**kwargs)
 
     dlon = 360 / ny
 
@@ -76,8 +76,8 @@ def polar_view(data, header, pole='north', return_alpha=False,
     grid = view_new.grid()
     view = View.from_header(header)
 
-    transform = (view_new.to_carrington() -
-                 view.to_carrington(**kwargs))
+    transform = (view_new.transform() -
+                 view.transform(**kwargs))
 
     grid, alpha = transform(grid)
     data_ = map_coordinates(np.nan_to_num(data), grid, cval=np.nan)

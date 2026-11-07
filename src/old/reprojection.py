@@ -173,7 +173,7 @@ class View:
         return grid
 
     def reproject(self, image, view, grid=None, distort=None, correct_mu=False, **kwargs):
-        transform = self.to_carrington(**kwargs) - view.to_carrington(**kwargs)
+        transform = self.to_carrington(**kwargs) - view.transform(**kwargs)
         if grid is None:
             grid = self.grid(**kwargs)
 

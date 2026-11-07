@@ -11,19 +11,6 @@ CLIGHT = 299792458
 RSUN = 696e8
 
 
-def get_jdn(date):
-    from datetime import datetime
-
-    if isinstance(date, str):
-        return get_jdn(datetime.fromisoformat(date))
-
-    date0 = datetime(2000, 1, 1, 12, 0, 0)
-    jd0 = 2451545.
-
-    jd = jd0 + (date - date0).total_seconds() / 24 / 60 / 60
-    return jd
-
-
 class ViewBase(ABC):
 
     def __init__(self, *, nx, ny, **kwargs):
@@ -34,7 +21,7 @@ class ViewBase(ABC):
             setattr(self, key, value)
 
     @abstractmethod
-    def to_carrington(self, **kwargs):
+    def transform(self, **kwargs):
         pass
 
     def copy(self):
@@ -63,7 +50,7 @@ class ViewBase(ABC):
         return grid
 
     def reproject(self, image, view, **kwargs):
-        transform = self.to_carrington(**kwargs) - view.to_carrington(**kwargs)
+        transform = self.transform(**kwargs) - view.transform(**kwargs)
         grid_, alpha = transform(self.grid)
 
         image_ = map_coordinates(np.nan_to_num(image), grid_, cval=np.nan)
@@ -74,7 +61,7 @@ class Map(ViewBase):
     def __init__(self, nx, ny, sine=False):
         super().__init__(nx=nx, ny=ny, sine=sine)
 
-    def to_carrington(self, **kwargs):
+    def transform(self, **kwargs):
         transform = (Normalize(((self.nx - 1) / 2, 0), ((self.nx - 1) / 180, self.ny / 360)) -
                      ToSpherical(self.sine))
         return transform
@@ -82,14 +69,14 @@ class Map(ViewBase):
 
 class View(ViewBase):
     def __init__(self, nx, ny, xc, yc, rsun, crota, crlt, crln, hgln=0.,
-                 vr=0., vw=0., vn=0., rsun_deg=0., dsun=AU, jdn=0., minmu=-np.inf, powmu=0.):
+                 vr=0., vw=0., vn=0., rsun_deg=0., dsun=AU, date='', minmu=-np.inf, powmu=0.):
         '''
         A WCS information container.
         '''
         super().__init__(nx=nx, ny=ny, xc=xc, yc=yc, rsun=rsun,
                          crota=crota, crlt=crlt, crln=crln % 360, hgln=hgln % 360,
                          vr=vr, vw=vw, vn=vn, rsun_deg=rsun_deg, dsun=dsun,
-                         jdn=jdn, minmu=minmu, powmu=powmu)
+                         date=date, minmu=minmu, powmu=powmu)
 
     @classmethod
     def from_header(cls, header):
@@ -152,11 +139,11 @@ class View(ViewBase):
             dsun = AU
 
         if 'DATE-OBS' in header:
-            jdn = get_jdn(header['DATE-OBS'])
+            date = header['DATE-OBS']
         else:
-            jdn = 0.
+            date = ''
 
-        return cls(nx, ny, xc, yc, rsun, crota, crlt, crln, hgln, vr, vw, vn, rsun_deg, dsun, jdn, 0., 1.)
+        return cls(nx, ny, xc, yc, rsun, crota, crlt, crln, hgln, vr, vw, vn, rsun_deg, dsun, date, 0., 1.)
 
     def update_header(self, header, inplace=False):
         '''
@@ -198,9 +185,23 @@ class View(ViewBase):
         if 'DSUN_OBS' in header_new:
             header_new['DSUN_OBS'] = self.dsun
 
+        if 'DATE-OBS' in header_new:
+            header_new['DATE-OBS'] = self.date
+
         header_new['CDELT1'] = self.rsun_deg * 3600 / self.rsun
         header_new['CDELT2'] = self.rsun_deg * 3600 / self.rsun
         return header_new
+
+    @property
+    def julday(self):
+        from datetime import datetime
+
+        date = datetime.fromisoformat(self.date)
+        date0 = datetime(2000, 1, 1, 12, 0, 0)
+        jd0 = 2451545.
+
+        jd = jd0 + (date - date0).total_seconds() / 24 / 60 / 60
+        return jd
 
     def to_heliographic(self, **kwargs):
 
@@ -219,7 +220,7 @@ class View(ViewBase):
 
         return transform
 
-    def to_carrington(self, correct_dr=False, **kwargs):
+    def transform(self, correct_dr=False, **kwargs):
         tdel = (AU - self.dsun) / CLIGHT / 24 / 3600
         crln = self.crln + tdel * WSID
 
@@ -228,7 +229,7 @@ class View(ViewBase):
                      rot)
 
         if correct_dr:
-            #transform -= DiffRotate(self.jdn - tdel, diff_rot)
+            #transform -= DiffRotate(self.julday - tdel, diff_rot)
             transform -= DiffRotate(1, diff_rot2,
                                     dsun_obs=self.dsun, obs_vn=self.vn, obs_vw=self.vw, obs_vr=self.vr,
                                     crln_obs=crln, crlt_obs=self.crlt)
