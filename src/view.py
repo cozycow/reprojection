@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 import numpy as np
 from scipy.ndimage import map_coordinates
 from transforms import *
@@ -23,34 +24,21 @@ def get_jdn(date):
     return jd
 
 
-class View:
-    def __init__(self, nx, ny, xc, yc, rsun, crota, crlt, crln, hgln=0.,
-                 vr=0., vw=0., vn=0., rsun_deg=0., dsun=AU, jdn=0., minmu=-np.inf, powmu=0.):
-        '''
-        A WCS information container.
-        '''
+class ViewBase(ABC):
 
+    def __init__(self, *, nx, ny, **kwargs):
         self.nx = nx
         self.ny = ny
-        self.xc = xc
-        self.yc = yc
-        self.rsun = rsun
-        self.crota = crota
-        self.crlt = crlt
-        self.crln = crln % 360
-        self.hgln = hgln % 360
-        self.vr = vr
-        self.vw = vw
-        self.vn = vn
-        self.rsun_deg = rsun_deg
-        self.dsun = dsun
-        self.jdn = jdn
-        self.minmu = minmu
-        self.powmu = powmu
 
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+    @abstractmethod
+    def to_carrington(self, **kwargs):
+        pass
 
     def copy(self):
-        return View(**self.__dict__)
+        return type(self)(**self.__dict__)
 
     def update(self, increment=False, multiply=False, inplace=False, **kwargs):
         if not inplace:
@@ -68,6 +56,40 @@ class View:
                     setattr(view_new, key, value)
 
         return view_new
+
+    @property
+    def grid(self):
+        grid = tuple(np.mgrid[:self.nx, :self.ny].astype(np.float32))
+        return grid
+
+    def reproject(self, image, view, **kwargs):
+        transform = self.to_carrington(**kwargs) - view.to_carrington(**kwargs)
+        grid_, alpha = transform(self.grid)
+
+        image_ = map_coordinates(np.nan_to_num(image), grid_, cval=np.nan)
+        return image_, alpha
+
+
+class Map(ViewBase):
+    def __init__(self, nx, ny, sine=False):
+        super().__init__(nx=nx, ny=ny, sine=sine)
+
+    def to_carrington(self, **kwargs):
+        transform = (Normalize(((self.nx - 1) / 2, 0), ((self.nx - 1) / 180, self.ny / 360)) -
+                     ToSpherical(self.sine))
+        return transform
+
+
+class View(ViewBase):
+    def __init__(self, nx, ny, xc, yc, rsun, crota, crlt, crln, hgln=0.,
+                 vr=0., vw=0., vn=0., rsun_deg=0., dsun=AU, jdn=0., minmu=-np.inf, powmu=0.):
+        '''
+        A WCS information container.
+        '''
+        super().__init__(nx=nx, ny=ny, xc=xc, yc=yc, rsun=rsun,
+                         crota=crota, crlt=crlt, crln=crln % 360, hgln=hgln % 360,
+                         vr=vr, vw=vw, vn=vn, rsun_deg=rsun_deg, dsun=dsun,
+                         jdn=jdn, minmu=minmu, powmu=powmu)
 
     @classmethod
     def from_header(cls, header):
@@ -136,7 +158,6 @@ class View:
 
         return cls(nx, ny, xc, yc, rsun, crota, crlt, crln, hgln, vr, vw, vn, rsun_deg, dsun, jdn, 0., 1.)
 
-
     def update_header(self, header, inplace=False):
         '''
         Updates WCS information in header
@@ -181,11 +202,6 @@ class View:
         header_new['CDELT2'] = self.rsun_deg * 3600 / self.rsun
         return header_new
 
-    @property
-    def grid(self):
-        grid = tuple(np.mgrid[:self.nx, :self.ny].astype(np.float32))
-        return grid
-
     def to_heliographic(self, **kwargs):
 
         def mu_filter(r, minmu=0., theta=0.):
@@ -219,48 +235,5 @@ class View:
 
         return transform
 
-    def reproject(self, image, view, **kwargs):
-        transform = self.to_carrington(**kwargs) - view.to_carrington(**kwargs)
-        grid_, alpha = transform(self.grid)
-
-        image_ = map_coordinates(np.nan_to_num(image), grid_, cval=np.nan)
-        return image_, alpha
 
 
-class Map:
-    def __init__(self, nx, ny, sine=False):
-        self.nx = nx
-        self.ny = ny
-        self.sine = sine
-
-    def copy(self):
-        return Map(**self.__dict__)
-
-    def update(self, inplace=False, **kwargs):
-        if not inplace:
-            view_new = self.copy()
-        else:
-            view_new = self
-
-        for key, value in kwargs.items():
-            if key in self.__dict__:
-                setattr(view_new, key, value)
-
-        return view_new
-
-    @property
-    def grid(self):
-        grid = tuple(np.mgrid[:self.nx, :self.ny].astype(np.float32))
-        return grid
-
-    def to_carrington(self, **kwargs):
-        transform = (Normalize(((self.nx - 1) / 2, 0), ((self.nx - 1) / 180, self.ny / 360)) -
-                     ToSpherical(self.sine))
-        return transform
-
-    def reproject(self, image, view, **kwargs):
-        transform = self.to_carrington(**kwargs) - view.to_carrington(**kwargs)
-        grid_, alpha = transform(self.grid)
-
-        image_ = map_coordinates(np.nan_to_num(image), grid_, cval=np.nan)
-        return image_, alpha
