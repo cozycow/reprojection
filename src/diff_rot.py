@@ -53,10 +53,10 @@ def get_time(crln, dsun_obs, obs_vn, obs_vw, obs_vr, crln_obs, crlt_obs):
     dt = (t - t_obs) / 24 / 3600
 
     rot = ~Rotate.x(crlt_obs) + Rotate.y(crln_obs)
-    r_obs = rot((0, 0, 1))[0]
-    axis_obs = rot((-obs_vn, obs_vw, 0))[0]
+    r_obs = rot(0, 0, 1)
+    axis_obs = rot(-obs_vn, obs_vw, 0)
 
-    r_ = Rotate.from_axis_angle(axis_obs, phi)(r_obs)[0]
+    r_ = Rotate.from_axis_angle(axis_obs, phi)(*r_obs)
     delta_ = (np.arctan2(r_[0], r_[2]) * 180 / np.pi - dt * WSID) % 360
 
     for k in np.where(delta_[1:] > delta_[:-1])[0]:

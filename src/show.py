@@ -13,8 +13,8 @@ def show_data(data, view, title='', label=r'$B_{los}$, G', figsize=(10,10), cmap
     transform = ~(view.transform() + ToSpherical())
     data_ = data.copy()
 
-    grid = np.mgrid[-90:90.5:1,0:360.5:1]
-    grid, _ = transform(grid)
+    grid = tuple(np.mgrid[-90:90.5:1,0:360.5:1])
+    grid = transform(*grid, 1)[:-1]
     grid = np.array(grid)
 
     meridians = grid[:,:,::15]

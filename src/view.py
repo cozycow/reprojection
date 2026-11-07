@@ -48,9 +48,9 @@ class ViewBase(ABC):
 
     def reproject(self, image, view, **kwargs):
         transform = self.transform(**kwargs) - view.transform(**kwargs)
-        grid_, alpha = transform(self.grid)
+        xi, yi, alpha = transform(*self.grid, 1)
 
-        image_ = map_coordinates(np.nan_to_num(image), grid_, cval=np.nan)
+        image_ = map_coordinates(np.nan_to_num(image), (xi, yi), cval=np.nan)
         return image_, alpha
 
 
@@ -67,7 +67,7 @@ class Map(ViewBase):
 
     @property
     def grid(self):
-        grid = np.mgrid[:self.nx, :self.ny].astype(np.float32)
+        grid = tuple(np.mgrid[:self.nx, :self.ny].astype(np.float32))
         return grid
 
 
@@ -212,7 +212,7 @@ class View(ViewBase):
 
     @property
     def grid(self):
-        grid = np.mgrid[:self.nx, :self.ny].astype(np.float32)
+        grid = tuple(np.mgrid[:self.nx, :self.ny].astype(np.float32))
         return grid
 
     @property
@@ -226,18 +226,10 @@ class View(ViewBase):
 
     def to_heliographic(self, **kwargs):
 
-        def mu_filter(r, minmu=0., theta=0.):
-            x, y, z = r
-            q = np.sin(theta * np.pi / 180)
-            mu = (z - q) / np.sqrt(q ** 2 - 2 * q * z + 1)
-            t = np.where(mu < minmu)
-            x[t], y[t], z[t], mu[t] = np.nan, np.nan, np.nan, np.nan
-            return mu
-
         transform = (Normalize((self.xc, self.yc), (self.rsun, self.rsun)) +
                      To3d() +
                      ToParaxial(self.rsun_deg) +
-                     Filter(mu_filter, self.powmu, minmu=self.minmu, theta=self.rsun_deg) +
+                     MuFilter(self.minmu, self.rsun_deg, self.powmu) +
                      Rotate.z(self.crota))
 
         return transform

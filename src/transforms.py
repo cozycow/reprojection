@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 class Transform(ABC):
 
     @abstractmethod
-    def __call__(self, r, alpha=1):
+    def __call__(self, *args):
         pass
 
     @abstractmethod
@@ -43,11 +43,10 @@ class Pipe(Transform, list):
     def __init__(self, *items, **kwargs):
         super().__init__(items)
 
-    def __call__(self, r, alpha=1):
-        r_, alpha_ = r, alpha
+    def __call__(self, *args):
         for transform in self:
-            r_, alpha_ = transform(r_, alpha_)
-        return r_, alpha_
+            args = transform(*args)
+        return args
 
     def __getitem__(self, ii):
         item = super().__getitem__(ii)
@@ -93,8 +92,9 @@ class Normalize(Transform):
     def __repr__(self):
         return f'Normalize(shift:{self.shift}, scale:{self.scale})'
 
-    def __call__(self, r, alpha=1):
-        return tuple((x - a) / b for x, a, b in zip(r, self.shift, self.scale)), alpha
+    def __call__(self, *args):
+        return (tuple((x - a) / b for x, a, b in zip(args[:len(self.shift)], self.shift, self.scale)) +
+                args[len(self.shift):])
 
     def __invert__(self):
         return type(self)(tuple(-x / y for x, y in zip(self.shift, self.scale)), tuple(1 / x for x in self.scale))
@@ -103,41 +103,6 @@ class Normalize(Transform):
         if isinstance(other, type(self)):
             return type(self)(tuple(x + y * a for x, y, a in zip(self.shift, other.shift, self.scale)),
                               tuple(a * b for a, b in zip(self.scale, other.scale)))
-        else:
-            return super().__add__(other)
-
-
-class ToParaxial(Transform):
-
-    def __new__(cls, *args, **kwargs):
-        if args[0] == 0.:
-            return Pipe()
-        else:
-            return super().__new__(cls)
-
-    def __init__(self, theta):
-        self.theta = theta
-
-    def __repr__(self):
-        return f'ToParaxial(theta:{self.theta})'
-
-    def __call__(self, r, alpha=1):
-        x, y, z = r
-
-        q = np.sin(self.theta * np.pi / 180)
-        p = 1 / (1 + q * z)
-
-        u = np.sqrt(1 - q ** 2) * p
-        x, y = x * u, y * u
-        z = (z + q) * p
-        return (x, y, z), alpha
-
-    def __invert__(self):
-        return type(self)(-self.theta)
-
-    def __add__(self, other):
-        if isinstance(other, type(self)):
-            return type(self)(self.theta + other.theta)
         else:
             return super().__add__(other)
 
@@ -203,8 +168,8 @@ class Rotate(Transform):
         axis = [0, 0, 1]
         return cls.from_axis_angle(axis, angle)
 
-    def __call__(self, r, alpha=1):
-        return tuple(np.squeeze((self * type(self)(0, *r) * (~self)).u)), alpha
+    def __call__(self, *args):
+        return tuple(np.squeeze((self * type(self)(0, *args[:3]) * (~self)).u)) + args[3:]
 
     def __add__(self, other):
         if isinstance(other, type(self)):
@@ -229,13 +194,13 @@ class DiffRotate(Transform):
     def __repr__(self):
         return f'CorrectDR(jdn:{self.time})'
 
-    def __call__(self, r, alpha=1):
-        W = self.func(r, **self.kwargs)
+    def __call__(self, *args):
+        W = self.func(args[:3], **self.kwargs)
         W_ = np.sqrt(sum(w ** 2 for w in W))
         angle = W_ * self.time
 
         rot = Rotate.from_axis_angle(W, angle)
-        return rot(r, alpha)
+        return rot(*args)
 
     def __invert__(self):
         return type(self)(-self.time, self.func, **self.kwargs)
@@ -256,24 +221,82 @@ class To3d(Transform):
     def __repr__(self):
         return f'Make3d(inv:{self.inv})'
 
-    def __call__(self, r, alpha=1):
+    def __call__(self, *args):
         if not self.inv:
-            y, x = r
+            y, x = args[:2]
             z = 1 - x ** 2 - y ** 2
 
             t = np.where(z < 0)
             x[t], y[t], z[t] = np.nan, np.nan, np.nan
             z = np.sqrt(z)
-            return (x, y, z), alpha
+            return (x, y, z) + args[2:]
         else:
-            x, y, z = r
+            x, y, z = args[:3]
 
             t = np.where(z < -1e-8)
             x[t], y[t] = np.nan, np.nan
-            return (y, x), alpha
+            return (y, x) + args[3:]
 
     def __invert__(self):
         return type(self)(not self.inv)
+
+
+class ToParaxial(Transform):
+
+    def __new__(cls, *args, **kwargs):
+        if args[0] == 0.:
+            return Pipe()
+        else:
+            return super().__new__(cls)
+
+    def __init__(self, theta):
+        self.theta = theta
+
+    def __repr__(self):
+        return f'ToParaxial(theta:{self.theta})'
+
+    def __call__(self, *args):
+        x, y, z = args[:3]
+
+        q = np.sin(self.theta * np.pi / 180)
+        p = 1 / (1 + q * z)
+
+        u = np.sqrt(1 - q ** 2) * p
+        x, y = x * u, y * u
+        z = (z + q) * p
+        return (x, y, z) + args[3:]
+
+    def __invert__(self):
+        return type(self)(-self.theta)
+
+    def __add__(self, other):
+        if isinstance(other, type(self)):
+            return type(self)(self.theta + other.theta)
+        else:
+            return super().__add__(other)
+
+
+class MuFilter(Transform):
+
+    def __init__(self, minmu=0., theta=0., pow=1.):
+        self.minmu = minmu
+        self.theta = theta
+        self.pow = pow
+
+    def __repr__(self):
+        return f'MuFilter(pow:{self.pow})'
+
+    def __call__(self, *args):
+        z = args[2]
+        q = np.sin(self.theta * np.pi / 180)
+        mu = (z - q) / np.sqrt(q ** 2 - 2 * q * z + 1)
+        t = np.where(mu < self.minmu)
+        mu[t] = np.nan
+
+        return args[:-1] + (args[-1] * mu ** self.pow,)
+
+    def __invert__(self):
+        return type(self)(self.minmu, self.theta, -self.pow)
 
 
 class ToSpherical(Transform):
@@ -282,65 +305,29 @@ class ToSpherical(Transform):
         self.sine = sine
         self.inv = inv
 
-    def __call__(self, r, alpha=1):
+    def __call__(self, *args):
         if not self.inv:
-            x, y, z = r
+            x, y, z = args[:3]
             if self.sine:
                 theta = y * 90
             else:
                 theta = np.arcsin(y) * 180 / np.pi
             phi = np.arctan2(x, z) * 180 / np.pi
             phi = phi % 360
-            return (theta, phi), alpha
+            return (theta, phi) + args[3:]
         else:
-            theta, phi = r
+            theta, phi = args[:2]
             if self.sine:
                 y = theta / 90
             else:
                 y = np.sin(theta * np.pi / 180)
             x, z = (np.cos(theta * np.pi / 180) * np.sin(phi * np.pi / 180),
                     np.cos(theta * np.pi / 180) * np.cos(phi * np.pi / 180))
-            return (x, y, z), alpha
+            return (x, y, z) + args[2:]
 
     def __repr__(self):
         return f'ToSpherical(sine:{self.sine}, inv:{self.inv})'
 
     def __invert__(self):
         return ToSpherical(self.sine, not self.inv)
-
-
-class Filter(Transform):
-
-    def __init__(self, func, pow=1, **kwargs):
-        self.func = func
-        self.pow = pow
-        self.kwargs = kwargs
-
-    def __repr__(self):
-        return f'Filter(func:{self.func}, inv:{self.pow})'
-
-    def __call__(self, r, alpha=1):
-        return r, alpha * self.func(r, **self.kwargs) ** self.pow
-
-
-    def __invert__(self):
-        return type(self)(self.func, -self.pow, **self.kwargs)
-
-
-class Custom(Transform):
-
-    def __init__(self, func, func_inv, *args, **kwargs):
-        self.func = func
-        self.func_inv = func_inv
-        self.args = args
-        self.kwargs = kwargs
-
-    def __repr__(self):
-        return f'Custom({self.func.__repr__()}, {self.func_inv.__repr__()})'
-
-    def __call__(self, r, alpha=1):
-        return self.func(r, alpha, *self.args, **self.kwargs)
-
-    def __invert__(self):
-        return type(self)(self.func_inv, self.func, *self.args, **self.kwargs)
 
