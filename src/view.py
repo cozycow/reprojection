@@ -25,7 +25,7 @@ def get_jdn(date):
 
 class View:
     def __init__(self, nx, ny, xc, yc, rsun, crota, crlt, crln, hgln=0.,
-                 vr=0., vw=0., vn=0., rsun_arc=0., dsun=AU, jdn=0., minmu=-np.inf, powmu=0.):
+                 vr=0., vw=0., vn=0., rsun_deg=0., dsun=AU, jdn=0., minmu=-np.inf, powmu=0.):
         '''
         A WCS information container.
         '''
@@ -42,7 +42,7 @@ class View:
         self.vr = vr
         self.vw = vw
         self.vn = vn
-        self.rsun_arc = rsun_arc
+        self.rsun_deg = rsun_deg
         self.dsun = dsun
         self.jdn = jdn
         self.minmu = minmu
@@ -59,8 +59,7 @@ class View:
             view_new = self
 
         for key, value in kwargs.items():
-            if key in ['nx', 'ny', 'xc', 'yc', 'rsun', 'crota', 'crlt', 'crln', 'hgln',
-                       'vr', 'vw', 'vn', 'rsun_arc', 'dsun', 'jdn', 'minmu', 'powmu']:
+            if key in self.__dict__:
                 if increment:
                     setattr(view_new, key, getattr(self, key) + value)
                 elif multiply:
@@ -119,11 +118,11 @@ class View:
             vn = 0.
 
         if 'RSUN_ARC' in header:
-            rsun_arc = header['RSUN_ARC']
+            rsun_deg = header['RSUN_ARC'] / 3600
         elif 'RSUN_OBS' in header:
-            rsun_arc = header['RSUN_OBS']
+            rsun_deg = header['RSUN_OBS'] / 3600
         else:
-            rsun_arc = 0.
+            rsun_deg = 0.
 
         if 'DSUN_OBS' in header:
             dsun = header['DSUN_OBS']
@@ -135,7 +134,7 @@ class View:
         else:
             jdn = 0.
 
-        return cls(nx, ny, xc, yc, rsun, crota, crlt, crln, hgln, vr, vw, vn, rsun_arc, dsun, jdn, 0., 1.)
+        return cls(nx, ny, xc, yc, rsun, crota, crlt, crln, hgln, vr, vw, vn, rsun_deg, dsun, jdn, 0., 1.)
 
 
     def update_header(self, header, inplace=False):
@@ -157,9 +156,9 @@ class View:
         header_new['CRPIX1'] = self.yc
 
         if 'RSUN_ARC' in header_new:
-            header_new['RSUN_ARC'] = self.rsun_arc
+            header_new['RSUN_ARC'] = self.rsun_deg * 3600
         elif 'RSUN_OBS' in header_new:
-            header_new['RSUN_OBS'] = self.rsun_arc
+            header_new['RSUN_OBS'] = self.rsun_deg * 3600
 
         if 'CROTA' in header_new:
             header_new['CROTA'] = self.crota
@@ -178,9 +177,8 @@ class View:
         if 'DSUN_OBS' in header_new:
             header_new['DSUN_OBS'] = self.dsun
 
-        header_new['CDELT1'] = self.rsun_arc / self.rsun
-        header_new['CDELT2'] = self.rsun_arc / self.rsun
-
+        header_new['CDELT1'] = self.rsun_deg * 3600 / self.rsun
+        header_new['CDELT2'] = self.rsun_deg * 3600 / self.rsun
         return header_new
 
     @property
@@ -188,34 +186,29 @@ class View:
         grid = tuple(np.mgrid[:self.nx, :self.ny].astype(np.float32))
         return grid
 
-    def get_transform(self, name='image', **kwargs):
-        return getattr(self, 'to_' + name, Pipe)(**kwargs)
-
-    def to_heliographic(self, origin='image', **kwargs):
+    def to_heliographic(self, **kwargs):
 
         def mu_filter(r, minmu=0., theta=0.):
             x, y, z = r
             q = np.sin(theta * np.pi / 180)
             mu = (z - q) / np.sqrt(q ** 2 - 2 * q * z + 1)
             t = np.where(mu < minmu)
-            x[t], y[t], z[t] = np.nan, np.nan, np.nan
+            x[t], y[t], z[t], mu[t] = np.nan, np.nan, np.nan, np.nan
             return mu
 
-        transform = (~self.get_transform(origin, **kwargs) +
-                     Normalize((self.xc, self.yc), (self.rsun, self.rsun)) +
-                     Make3d(self.rsun_arc / 3600) +
-                     Filter(mu_filter, self.powmu, minmu=self.minmu, theta=self.rsun_arc / 3600) +
+        transform = (Normalize((self.xc, self.yc), (self.rsun, self.rsun)) +
+                     Make3d(self.rsun_deg) +
+                     Filter(mu_filter, self.powmu, minmu=self.minmu, theta=self.rsun_deg) +
                      Rotate.z(self.crota))
 
         return transform
 
-    def to_carrington(self, origin='image', correct_dr=False, **kwargs):
+    def to_carrington(self, correct_dr=False, **kwargs):
         tdel = (AU - self.dsun) / CLIGHT / 24 / 3600
         crln = self.crln + tdel * WSID
 
         rot = ~Rotate.x(self.crlt) + Rotate.y(crln)
-        transform = (~self.get_transform(origin, **kwargs) +
-                     self.to_heliographic(**kwargs) +
+        transform = (self.to_heliographic(**kwargs) +
                      rot)
 
         if correct_dr:
@@ -235,10 +228,10 @@ class View:
 
 
 class Map:
-    def __init__(self, nx, ny, projection=None):
+    def __init__(self, nx, ny, sine=False):
         self.nx = nx
         self.ny = ny
-        self.projection = projection
+        self.sine = sine
 
     def copy(self):
         return Map(**self.__dict__)
@@ -250,7 +243,7 @@ class Map:
             view_new = self
 
         for key, value in kwargs.items():
-            if key in ['nx', 'ny']:
+            if key in self.__dict__:
                 setattr(view_new, key, value)
 
         return view_new
@@ -261,14 +254,8 @@ class Map:
         return grid
 
     def to_carrington(self, **kwargs):
-        transform = Normalize(((self.nx - 1) / 2, 0), ((self.nx - 1) / 180, self.ny / 360))
-
-        if self.projection == 'sine_lat':
-            sine_transform = Custom(lambda r, alpha: ((np.sin(r[0] * np.pi / 180) * 90,) + r[1:], alpha),
-                                    lambda r, alpha: ((np.arcsin(r[0] / 90) * 180 / np.pi,) + r[1:], alpha))
-            transform -= sine_transform
-
-        transform -= ToSpherical()
+        transform = (Normalize(((self.nx - 1) / 2, 0), ((self.nx - 1) / 180, self.ny / 360)) -
+                     ToSpherical(self.sine))
         return transform
 
     def reproject(self, image, view, **kwargs):

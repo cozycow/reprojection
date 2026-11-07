@@ -14,7 +14,7 @@ def reproject(data, header, header_new=None, kind='',
 
     elif kind == 'synoptic':
         nx, ny = 720, 1800
-        view_new = Map(nx, ny, projection='sine_lat')
+        view_new = Map(nx, ny, sine=True)
 
     elif kind == 'north':
         nx, ny = 1024, 1024
@@ -35,7 +35,7 @@ def reproject(data, header, header_new=None, kind='',
         xc, yc = (nx - 1) / 2, (ny - 1) / 2
         rsun = 0.45 * nx
         view_new = View(nx, ny, xc, yc, rsun, 0, 0, 90,
-                        rsun_arc=-45 * 3600, vw=np.inf, jdn=view.jdn, powmu=1.)
+                        rsun_deg=-45, vw=np.inf, jdn=view.jdn, powmu=1.)
 
     else:
         view_new = view.copy()

@@ -116,20 +116,23 @@ class Make3d(Transform):
 
     def __paraxial(self, r):
         x, y, z = r
-        a = np.sqrt(x ** 2 + y ** 2 + z ** 2)
 
         q = np.sin(self.theta * np.pi / 180)
-        p = a / (a + q * z)
+        p = 1 / (1 + q * z)
 
         u = np.sqrt(1 - q ** 2) * p
         x, y = x * u, y * u
-        z = (z + q * a) * p
+        z = (z + q) * p
         return x, y, z
 
     def __call__(self, r, alpha=1):
         if len(r) == 2:
             y, x = r
-            z = np.sqrt(1 - x ** 2 - y ** 2)
+            z = 1 - x ** 2 - y ** 2
+
+            t = np.where(z < 0)
+            x[t], y[t], z[t] = np.nan, np.nan, np.nan
+            z = np.sqrt(z)
             return self.__paraxial((x, y, z)), alpha
         else:
             x, y, z = self.__paraxial(r)
@@ -251,29 +254,35 @@ class DiffRotate(Transform):
 
 class ToSpherical(Transform):
 
-    def __init__(self, inv=False):
+    def __init__(self, sine=False, inv=False):
+        self.sine = sine
         self.inv = inv
 
     def __call__(self, r, alpha=1):
         if not self.inv:
             x, y, z = r
-            theta = np.arcsin(y) * 180 / np.pi
+            if self.sine:
+                theta = y * 90
+            else:
+                theta = np.arcsin(y) * 180 / np.pi
             phi = np.arctan2(x, z) * 180 / np.pi
             phi = phi % 360
             return (theta, phi), alpha
         else:
             theta, phi = r
-
-            y = np.sin(theta * np.pi / 180)
+            if self.sine:
+                y = theta / 90
+            else:
+                y = np.sin(theta * np.pi / 180)
             x, z = (np.cos(theta * np.pi / 180) * np.sin(phi * np.pi / 180),
                     np.cos(theta * np.pi / 180) * np.cos(phi * np.pi / 180))
             return (x, y, z), alpha
 
     def __repr__(self):
-        return f'ToSpherical(inv:{self.inv})'
+        return f'ToSpherical(sine:{self.sine}, inv:{self.inv})'
 
     def __invert__(self):
-        return ToSpherical(not self.inv)
+        return ToSpherical(self.sine, not self.inv)
 
 
 class Filter(Transform):

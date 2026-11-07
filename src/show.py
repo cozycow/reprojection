@@ -62,7 +62,7 @@ def show_data(data, view, title='', label=r'$B_{los}$, G', figsize=(10,10), cmap
 
 
 def show_map(data, map, figsize=(15,8), label=r'$B_{r}$, G', cmap='hmimag', vmin=-50, vmax=50, **kwargs):
-    if map.projection == 'sine_lat':
+    if map.sine:
         extent = (0, 360, -1, 1)
     else:
         extent = (0, 360, -90, 90)
@@ -72,7 +72,7 @@ def show_map(data, map, figsize=(15,8), label=r'$B_{r}$, G', cmap='hmimag', vmin
                    extent=extent, aspect='auto', **kwargs)
 
     ax.set_xticks(np.arange(0,361,30), np.arange(0,361,30))
-    if map.projection == 'sine_lat':
+    if map.sine:
         ax.set_yticks(np.sin(np.arange(-90, 91, 15) * np.pi / 180), np.arange(-90, 91, 15))
     else:
         ax.set_yticks(np.arange(-90, 91, 15), np.arange(-90, 91, 15))
