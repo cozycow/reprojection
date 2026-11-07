@@ -13,15 +13,8 @@ RSUN = 696e8
 
 class ViewBase(ABC):
 
-    def __init__(self, *, nx, ny, **kwargs):
-        self.nx = nx
-        self.ny = ny
-
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-
     @abstractmethod
-    def transform(self, **kwargs):
+    def __init__(self, *args, **kwargs):
         pass
 
     def copy(self):
@@ -45,9 +38,13 @@ class ViewBase(ABC):
         return view_new
 
     @property
+    @abstractmethod
     def grid(self):
-        grid = tuple(np.mgrid[:self.nx, :self.ny].astype(np.float32))
-        return grid
+        pass
+
+    @abstractmethod
+    def transform(self, **kwargs):
+        pass
 
     def reproject(self, image, view, **kwargs):
         transform = self.transform(**kwargs) - view.transform(**kwargs)
@@ -59,12 +56,19 @@ class ViewBase(ABC):
 
 class Map(ViewBase):
     def __init__(self, nx, ny, sine=False):
-        super().__init__(nx=nx, ny=ny, sine=sine)
+        self.nx = nx
+        self.ny = ny
+        self.sine = sine
 
     def transform(self, **kwargs):
         transform = (Normalize(((self.nx - 1) / 2, 0), ((self.nx - 1) / 180, self.ny / 360)) -
                      ToSpherical(self.sine))
         return transform
+
+    @property
+    def grid(self):
+        grid = np.mgrid[:self.nx, :self.ny].astype(np.float32)
+        return grid
 
 
 class View(ViewBase):
@@ -73,10 +77,24 @@ class View(ViewBase):
         '''
         A WCS information container.
         '''
-        super().__init__(nx=nx, ny=ny, xc=xc, yc=yc, rsun=rsun,
-                         crota=crota, crlt=crlt, crln=crln % 360, hgln=hgln % 360,
-                         vr=vr, vw=vw, vn=vn, rsun_deg=rsun_deg, dsun=dsun,
-                         date=date, minmu=minmu, powmu=powmu)
+        self.nx = nx
+        self.ny = ny
+        self.xc = xc
+        self.yc = yc
+        self.rsun = rsun
+        self.crota = crota
+        self.crlt = crlt
+        self.crln = crln % 360
+        self.hgln = hgln % 360
+        self.vr = vr
+        self.vw = vw
+        self.vn = vn
+        self.rsun_deg = rsun_deg
+        self.dsun = dsun
+        self.date = date
+        self.minmu = minmu
+        self.powmu = powmu
+
 
     @classmethod
     def from_header(cls, header):
@@ -193,15 +211,18 @@ class View(ViewBase):
         return header_new
 
     @property
-    def julday(self):
+    def grid(self):
+        grid = np.mgrid[:self.nx, :self.ny].astype(np.float32)
+        return grid
+
+    @property
+    def cdn(self):
         from datetime import datetime
 
         date = datetime.fromisoformat(self.date)
-        date0 = datetime(2000, 1, 1, 12, 0, 0)
-        jd0 = 2451545.
+        date0 = datetime(1853, 11, 9, 0, 0, 0)
 
-        jd = jd0 + (date - date0).total_seconds() / 24 / 60 / 60
-        return jd
+        return (date - date0).total_seconds() / 24 / 60 / 60
 
     def to_heliographic(self, **kwargs):
 
@@ -230,12 +251,9 @@ class View(ViewBase):
                      rot)
 
         if correct_dr:
-            #transform -= DiffRotate(self.julday - tdel, diff_rot)
+            #transform -= DiffRotate(self.cdn - tdel, diff_rot)
             transform -= DiffRotate(1, diff_rot2,
                                     dsun_obs=self.dsun, obs_vn=self.vn, obs_vw=self.vw, obs_vr=self.vr,
                                     crln_obs=crln, crlt_obs=self.crlt)
 
         return transform
-
-
-
