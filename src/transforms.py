@@ -318,9 +318,9 @@ class ToSpherical(Transform):
         else:
             theta, phi = args[:2]
             if self.sine:
-                y = theta / 90
-            else:
-                y = np.sin(theta * np.pi / 180)
+                theta = np.arcsin(theta / 90) * 180 / np.pi
+
+            y = np.sin(theta * np.pi / 180)
             x, z = (np.cos(theta * np.pi / 180) * np.sin(phi * np.pi / 180),
                     np.cos(theta * np.pi / 180) * np.cos(phi * np.pi / 180))
             return (x, y, z) + args[2:]

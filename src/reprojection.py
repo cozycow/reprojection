@@ -4,7 +4,7 @@ from view import View, Map
 
 
 def reproject(data, header, header_new=None, kind='',
-              correct_mu=True, mu_thr=0.,
+              mu_thr=0.,
               **kwargs):
 
     view = View.from_header(header).update(minmu=mu_thr)
@@ -81,13 +81,12 @@ def make_map(files, correct_crota=True, binning=1, **kwargs):
         data, view = reproject(data, header, return_alpha=True, **kwargs)
         data, alpha = data
         data = data / alpha
+        mu = 1 / alpha
 
         if map is None:
             map = view.copy()
 
-        mu = 1 / alpha
-
-        weight = (~np.isnan(data)).astype(float)# * mu ** 2
+        weight = (~np.isnan(data)).astype(float)
         coverage += np.nan_to_num(weight)
 
         mean_mu += np.nan_to_num((mu - mean_mu) * weight / coverage)
