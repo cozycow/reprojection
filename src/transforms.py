@@ -312,17 +312,17 @@ class ToSpherical(Transform):
                 theta = y * 90
             else:
                 theta = np.arcsin(y) * 180 / np.pi
-            phi = np.arctan2(x, z) * 180 / np.pi
-            phi = phi % 360
+            phi = np.arctan2(x, z) * 180 / np.pi % 360
             return (theta, phi) + args[3:]
         else:
             theta, phi = args[:2]
             if self.sine:
-                theta = np.arcsin(theta / 90) * 180 / np.pi
-
-            y = np.sin(theta * np.pi / 180)
-            x, z = (np.cos(theta * np.pi / 180) * np.sin(phi * np.pi / 180),
-                    np.cos(theta * np.pi / 180) * np.cos(phi * np.pi / 180))
+                y = theta / 90
+            else:
+                y = np.sin(theta * np.pi / 180)
+            a = np.sqrt(1 - y ** 2)
+            x, z = (a * np.sin(phi * np.pi / 180),
+                    a * np.cos(phi * np.pi / 180))
             return (x, y, z) + args[2:]
 
     def __repr__(self):

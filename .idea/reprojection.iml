@@ -4,6 +4,9 @@
     <content url="file://$MODULE_DIR$/../flatfield/src" />
     <content url="file://$MODULE_DIR$">
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/examples/temp" />
+      <excludeFolder url="file://$MODULE_DIR$/polar_map/png" />
+      <excludeFolder url="file://$MODULE_DIR$/polar_map/temp" />
     </content>
     <orderEntry type="jdk" jdkName="$USER_HOME$/miniconda3 (2)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />

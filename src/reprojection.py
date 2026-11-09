@@ -3,8 +3,10 @@ from astropy.io import fits
 from view import View, Map
 
 
-def reproject(data, header, header_new=None, kind='',
-              mu_thr=0.,
+def reproject(data, header,
+              header_new=None,
+              kind='',
+              mu_thr=0.1,
               **kwargs):
 
     view = View.from_header(header).update(minmu=mu_thr)
@@ -47,7 +49,11 @@ def reproject(data, header, header_new=None, kind='',
 
 
 
-def make_map(files, correct_crota=True, binning=1, **kwargs):
+def make_map(files,
+             correct_crota=True,
+             binning=1,
+             return_variance=False,
+             **kwargs):
     '''
     Creates an averaged map by applying 'remap' routine to every dataset in files
     '''
@@ -65,7 +71,7 @@ def make_map(files, correct_crota=True, binning=1, **kwargs):
 
     for file in files:
         with fits.open(file) as hdul:
-            print(file)
+            #print(file)
 
             if 'hmi' in file:
                 data = hdul[1].data.copy()
@@ -89,22 +95,21 @@ def make_map(files, correct_crota=True, binning=1, **kwargs):
         weight = (~np.isnan(data)).astype(float)
         coverage += np.nan_to_num(weight)
 
-        mean_mu += np.nan_to_num((mu - mean_mu) * weight / coverage)
-        mean_data += np.nan_to_num((data - mean_data) * weight / coverage)
-
-        var_mu += np.nan_to_num((mu ** 2 - var_mu) * weight / coverage)
-        var_data += np.nan_to_num((data ** 2 - var_data) * weight / coverage)
         cov_data_mu += np.nan_to_num((data * mu - cov_data_mu) * weight / coverage)
+        var_mu += np.nan_to_num((mu ** 2 - var_mu) * weight / coverage)
 
-    cov_data_mu[coverage == 0] = np.nan
-    var_mu[coverage == 0] = np.nan
-    var_data[coverage == 0] = np.nan
-    mean_mu[coverage == 0] = np.nan
-    mean_data[coverage == 0] = np.nan
-    coverage[coverage == 0] = np.nan
+        if return_variance:
+            mean_mu += np.nan_to_num((mu - mean_mu) * weight / coverage)
+            mean_data += np.nan_to_num((data - mean_data) * weight / coverage)
+            var_data += np.nan_to_num((data ** 2 - var_data) * weight / coverage)
+
 
     beta = cov_data_mu / var_mu
-    variance = ((var_data - mean_data ** 2) - beta ** 2 * (var_mu - mean_mu ** 2)) / var_mu / (coverage - 1)
+    beta[coverage == 0] = np.nan
 
-    return beta, variance, map
+    if return_variance:
+        variance = ((var_data - mean_data ** 2) - beta ** 2 * (var_mu - mean_mu ** 2)) / var_mu / (coverage - 1)
+        beta = np.array([beta, variance])
+
+    return beta, map
 

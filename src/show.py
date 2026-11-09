@@ -1,4 +1,6 @@
 import numpy as np
+import glob
+from os import path
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 import sunpy.visualization.colormaps as cm
@@ -7,8 +9,8 @@ from transforms import ToSpherical, Normalize
 
 
 def show_data(data, view, title='', label=r'$B_{los}$, G', figsize=(10,10), cmap='hmimag', vmin=-200, vmax=200,
-              grid_alpha=0.5, grid_color='black', text_alpha=1, text_color='black',
-              to_file=None):
+              grid_alpha=0.5, grid_color='black', text_alpha=0.7, text_color='black',
+              to_file=None, to_folder=None):
 
     transform = ~(view.transform() + ToSpherical())
     data_ = data.copy()
@@ -20,7 +22,7 @@ def show_data(data, view, title='', label=r'$B_{los}$, G', figsize=(10,10), cmap
     meridians = grid[:,:,::15]
     parallels = np.transpose(grid[:,::15,:], (0,2,1))
 
-    if to_file is not None:
+    if to_file is not None or to_folder is not None:
         plt.ioff()
 
     fig, ax = plt.subplots(figsize=figsize)
@@ -52,6 +54,14 @@ def show_data(data, view, title='', label=r'$B_{los}$, G', figsize=(10,10), cmap
 
     plt.title(title, size=16)
     plt.tight_layout()
+
+    if to_folder is not None:
+        files_in_folder = sorted(glob.glob(path.join(to_folder, '*.png')))
+        if len(files_in_folder) == 0:
+            last_number = 0
+        else:
+            last_number = int(files_in_folder[-1].split('/')[-1].split('.')[0])
+        to_file = path.join(to_folder, '{:04d}'.format(last_number + 1) + '.png')
 
     if to_file is not None:
         plt.savefig(to_file)
