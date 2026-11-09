@@ -181,14 +181,14 @@ class Rotate(Transform):
 class DiffRotate(Transform):
 
     def __new__(cls, *args, **kwargs):
-        #if args[0] == 0.:
-        #    return Pipe()
-        #else:
-        return super().__new__(cls)
+        if args[0] == 0.:
+            return Pipe()
+        else:
+            return super().__new__(cls)
 
-    def __init__(self, time, func, **kwargs):
-        self.time = time
+    def __init__(self, func, time=1, **kwargs):
         self.func = func
+        self.time = time
         self.kwargs = kwargs
 
     def __repr__(self):
@@ -196,21 +196,18 @@ class DiffRotate(Transform):
 
     def __call__(self, *args):
         W = self.func(args[:3], **self.kwargs)
-        W_ = np.sqrt(sum(w ** 2 for w in W))
-        angle = W_ * self.time
-
-        rot = Rotate.from_axis_angle(W, angle)
+        rot = Rotate.y(W * self.time)
         return rot(*args)
 
     def __invert__(self):
-        return type(self)(-self.time, self.func, **self.kwargs)
+        return type(self)(self.func, -self.time, **self.kwargs)
 
     def __add__(self, other):
-        #if (isinstance(other, type(self)) and (self.func == other.func) and
-        #    all(self.kwargs[key] == other.kwargs[key] for key in self.kwargs.keys())):
-        #    return type(self)(self.time + other.time, self.func, **self.kwargs)
-        #else:
-        return super().__add__(other)
+        if (isinstance(other, type(self)) and (self.func == other.func) and
+            all(self.kwargs[key] == other.kwargs[key] for key in self.kwargs.keys())):
+            return type(self)(self.time + other.time, self.func, **self.kwargs)
+        else:
+            return super().__add__(other)
 
 
 class To3d(Transform):
