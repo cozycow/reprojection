@@ -6,6 +6,7 @@ from diff_rot import *
 
 
 WSID = 360 / 25.38
+ALPHA = 1.327124e20
 AU = 149597870691.
 CLIGHT = 299792458
 RSUN = 696e8
@@ -228,6 +229,45 @@ class View(ViewBase):
 
         return (date - date0).total_seconds() / 24 / 60 / 60
 
+    @property
+    def kepler(self):
+        vt = np.sqrt(self.vw ** 2 + self.vn ** 2)
+        p = (self.dsun * vt) ** 2 / ALPHA
+        v0 = np.sqrt(ALPHA / p)
+        e = np.sqrt((vt / v0 - 1) ** 2 + (self.vr / v0) ** 2)
+        a = p / (1 - e ** 2)
+        theta = np.arctan2(self.vr, vt - v0) * 180 / np.pi % 360
+        return a, e, theta
+
+    @property
+    def ecc_anomaly(self):
+        a, e, theta = self.kepler
+        cos_f = np.cos(theta * np.pi / 180)
+        sin_f = np.sin(theta * np.pi / 180)
+        return np.arctan2(np.sqrt(1 - e ** 2) * sin_f, e + cos_f) * 180 / np.pi
+
+    @property
+    def mean_anomaly(self):
+        a, e, theta = self.kepler
+        E = self.ecc_anomaly
+        return E - e * np.sin(E * np.pi / 180) * 180 / np.pi
+
+    @property
+    def wsyn(self):
+        a, e, theta = self.kepler
+        wobs = np.sqrt(ALPHA / a ** 3) * 180 / np.pi * 24 * 3600
+        return WSID - wobs
+
+    @property
+    def mean_crln(self):
+        a, e, theta = self.kepler
+        M = self.mean_anomaly
+        rot = ~Rotate.x(self.crlt) + Rotate.y(self.crln)
+        r_obs = rot(0, 0, 1)
+        axis_obs = rot(-self.vn, self.vw, 0)
+        r_ = Rotate.from_axis_angle(axis_obs, -theta)(*r_obs)
+        return M + np.arctan2(r_[0], r_[2]) * 180 / np.pi
+
     def to_heliographic(self, **kwargs):
 
         transform = (Normalize((self.xc, self.yc), (self.rsun, self.rsun)) +
@@ -249,7 +289,6 @@ class View(ViewBase):
         if correct_dr:
             #transform -= DiffRotate(self.cdn - tdel, diff_rot)
             transform -= DiffRotate(1, diff_rot2,
-                                    dsun_obs=self.dsun, obs_vn=self.vn, obs_vw=self.vw, obs_vr=self.vr,
-                                    crln_obs=crln, crlt_obs=self.crlt)
+                                    delta=self.mean_crln, wsyn=self.wsyn)
 
         return transform
