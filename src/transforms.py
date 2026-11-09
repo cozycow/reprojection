@@ -181,10 +181,10 @@ class Rotate(Transform):
 class DiffRotate(Transform):
 
     def __new__(cls, *args, **kwargs):
-        if args[0] == 0.:
-            return Pipe()
-        else:
-            return super().__new__(cls)
+        #if args[0] == 0.:
+        #    return Pipe()
+        #else:
+        return super().__new__(cls)
 
     def __init__(self, time, func, **kwargs):
         self.time = time
@@ -206,11 +206,11 @@ class DiffRotate(Transform):
         return type(self)(-self.time, self.func, **self.kwargs)
 
     def __add__(self, other):
-        if (isinstance(other, type(self)) and (self.func == other.func) and
-            all(self.kwargs[key] == other.kwargs[key] for key in self.kwargs.keys())):
-            return type(self)(self.time + other.time, self.func, **self.kwargs)
-        else:
-            return super().__add__(other)
+        #if (isinstance(other, type(self)) and (self.func == other.func) and
+        #    all(self.kwargs[key] == other.kwargs[key] for key in self.kwargs.keys())):
+        #    return type(self)(self.time + other.time, self.func, **self.kwargs)
+        #else:
+        return super().__add__(other)
 
 
 class To3d(Transform):

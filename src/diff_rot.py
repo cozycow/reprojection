@@ -11,7 +11,7 @@ def diff_rot2(r, *, dsun_obs, obs_vn, obs_vw, obs_vr, crln_obs, crlt_obs):
     theta_obs, a, e = kepler(dsun_obs, np.sqrt(obs_vw ** 2 + obs_vn ** 2), obs_vr)
     E_obs = ecc_anomaly(theta_obs, e)
     M_obs = mean_anomaly(E_obs, e)
-    w_obs = np.sqrt(ALPHA / a ** 3) / 24 / 3600
+    w_obs = np.sqrt(ALPHA / a ** 3) * 24 * 3600
 
     rot = ~Rotate.x(crlt_obs) + Rotate.y(crln_obs)
     r_obs = rot(0, 0, 1)
@@ -21,9 +21,16 @@ def diff_rot2(r, *, dsun_obs, obs_vn, obs_vw, obs_vr, crln_obs, crlt_obs):
     delta = M_obs + np.arctan2(r_[0], r_[2]) * 180 / np.pi
     delta = (delta - crln_obs + 180) % 360 - 180
 
+    #delta = 0
+
     crln = np.arctan2(r[0], r[2]) * 180 / np.pi
     time = ((crln - crln_obs + 180) % 360 - 180 - delta) / (WSID - w_obs)
+
+    print(w_obs, 360 / (WSID - w_obs))
+    #time = ((crln - delta + 180) % 360 - 180) / (WSID - w_obs)
     time = np.nan_to_num(time)
+
+    time[np.abs(time) > 360 / (WSID - w_obs) / 4] = np.nan
 
     w = diff_rot(r)
 

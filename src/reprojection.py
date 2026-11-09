@@ -41,12 +41,9 @@ def reproject(data, header, header_new=None, kind='',
         view_new = view.copy()
 
     view_new.update(inplace=True, **kwargs)
-    data_, alpha = view_new.reproject(data, view, **kwargs)
+    data_ = view_new.reproject(data, view, **kwargs)
 
-    if correct_mu:
-        data_ *= alpha
-
-    return data_, alpha, view_new
+    return data_, view_new
 
 
 
@@ -68,6 +65,8 @@ def make_map(files, correct_crota=True, binning=1, **kwargs):
 
     for file in files:
         with fits.open(file) as hdul:
+            print(file)
+
             if 'hmi' in file:
                 data = hdul[1].data.copy()
                 header = hdul[1].header.copy()
@@ -79,14 +78,16 @@ def make_map(files, correct_crota=True, binning=1, **kwargs):
                     header['CROTA'] = header['CROTA'] + 0.25 ### crota correction
 
         data = rebin(data, binning, update_header=header)
-        data, alpha, view = reproject(data, header, return_alpha=True, correct_mu=False, **kwargs)
+        data, view = reproject(data, header, return_alpha=True, **kwargs)
+        data, alpha = data
+        data = data / alpha
 
         if map is None:
             map = view.copy()
 
         mu = 1 / alpha
 
-        weight = (~np.isnan(data)).astype(float) #* mu
+        weight = (~np.isnan(data)).astype(float)# * mu ** 2
         coverage += np.nan_to_num(weight)
 
         mean_mu += np.nan_to_num((mu - mean_mu) * weight / coverage)

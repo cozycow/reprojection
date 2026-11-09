@@ -46,12 +46,16 @@ class ViewBase(ABC):
     def transform(self, **kwargs):
         pass
 
-    def reproject(self, image, view, **kwargs):
+    def reproject(self, image, view, return_alpha=False, **kwargs):
         transform = self.transform(**kwargs) - view.transform(**kwargs)
         xi, yi, alpha = transform(*self.grid, 1)
 
-        image_ = map_coordinates(np.nan_to_num(image), (xi, yi), cval=np.nan)
-        return image_, alpha
+        image_ = map_coordinates(np.nan_to_num(image), (xi, yi), cval=np.nan) * alpha
+
+        if return_alpha:
+            image_ = np.array([image_, alpha])
+
+        return image_
 
 
 class Map(ViewBase):
