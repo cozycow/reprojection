@@ -12,40 +12,37 @@ def show_data(data, view, title='', label=r'$B_{los}$, G', figsize=(10,10), cmap
               grid_alpha=0.5, grid_color='black', text_alpha=0.7, text_color='black',
               to_file=None, to_folder=None):
 
-    transform = ~(view.transform() + ToSpherical())
-    data_ = data.copy()
-
-    grid = tuple(np.mgrid[-90:90.5:1,0:360.5:1])
-    grid = transform(*grid, 1)[:-1]
-    grid = np.array(grid)
-
-    meridians = grid[:,:,::15]
-    parallels = np.transpose(grid[:,::15,:], (0,2,1))
-
     if to_file is not None or to_folder is not None:
         plt.ioff()
 
+    transform = ~(view.transform() + ToSpherical())
+
     fig, ax = plt.subplots(figsize=figsize)
-    image = ax.imshow(data_, origin='lower', cmap=cmap, vmin=vmin, vmax=vmax)
-    ax.plot(meridians[1][:,1:-1], meridians[0][:,1:-1], color=grid_color, ls='--', lw=0.5, alpha=grid_alpha)
-    ax.plot(meridians[1][:,0], meridians[0][:,0], color=grid_color, ls='-', lw=0.5, alpha=grid_alpha) # central meridian
+    image = ax.imshow(data, origin='lower', cmap=cmap, vmin=vmin, vmax=vmax)
 
-    ax.plot(parallels[1][:,:6], parallels[0][:,:6], color=grid_color, ls='--', lw=0.5, alpha=grid_alpha)
-    ax.plot(parallels[1][:,6], parallels[0][:,6], color=grid_color, ls='-', lw=0.5, alpha=grid_alpha) # equator
-    ax.plot(parallels[1][:,7:], parallels[0][:,7:], color=grid_color, ls='--', lw=0.5, alpha=grid_alpha)
+    if 'xc' in view.__dict__:
+        ax.add_patch(Circle((view.yc, view.xc), radius=view.rsun, color='black', ls='-', lw=0.5, alpha=1, fill=False)) # limb
 
-    ax.add_patch(Circle((view.yc, view.xc), radius=view.rsun, color='black', ls='-', lw=0.5, alpha=1, fill=False)) # limb
+    for phi in range(0,360,15):
+        theta = np.arange(-90,91)
+        grid = transform(theta, phi * np.ones_like(theta), 1)[:-1]
+        if phi == 0:
+            ls = '-'
+        else:
+            ls = '--'
+        ax.plot(grid[1], grid[0], color=grid_color, ls=ls, lw=0.5, alpha=grid_alpha)
+        ax.annotate(str(phi), (grid[1][90], grid[0][90]), color=text_color, alpha=text_alpha, size=8)
 
-    for i in range(0,360,15):
-        ax.annotate(i, (parallels[1][i,6], parallels[0][i,6]), color=text_color, alpha=text_alpha, size=8)
+    for theta in range(-90,91,15):
+        phi = np.arange(0,361)
+        grid = transform(theta * np.ones_like(phi), phi, 1)[:-1]
+        ax.plot(grid[1], grid[0], color=grid_color, ls='--', lw=0.5, alpha=grid_alpha)
 
-    for i in range(-90,91,15):
-        if i != 0:
-            ax.annotate(i, (meridians[1][i + 90,0], meridians[0][i + 90,0]), color=text_color, alpha=text_alpha, size=8)
+        if theta != 0:
+            ax.annotate(str(theta), (grid[1][0], grid[0][0]), color=text_color, alpha=text_alpha, size=8)
 
-    for i in range(-75,76,15):
-        if i != 0:
-            ax.annotate(i, (meridians[1][i + 90, 12], meridians[0][i + 90, 12]), color=text_color, alpha=text_alpha, size=8)
+        if theta != 0 and theta != -90 and theta != 90:
+            ax.annotate(str(theta), (grid[1][180], grid[0][180]), color=text_color, alpha=text_alpha, size=8)
 
     cax = ax.inset_axes((0.8, 0.985, 0.2, 0.015))
     fig.colorbar(image, cax=cax, orientation='horizontal', label=label)
