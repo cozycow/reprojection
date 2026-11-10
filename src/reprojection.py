@@ -23,14 +23,14 @@ def reproject(data, header,
         xc, yc = (nx - 1) / 2, (ny - 1) / 2
         rsun = 0.45 * nx
         view_new = View(nx, ny, xc, yc, rsun, -90, 90, 0,
-                        vw=np.inf, date=view.date, powmu=1.)
+                        vw=np.inf, date=view.date, minmu=-1e-8, powmu=1.)
 
     elif kind == 'south':
         nx, ny = 1024, 1024
         xc, yc = (nx - 1) / 2, (ny - 1) / 2
         rsun = 0.45 * nx
         view_new = View(nx, ny, xc, yc, rsun, 90, -90, 0,
-                        vw=np.inf, date=view.date, powmu=1.)
+                        vw=np.inf, date=view.date, minmu=-1e-8, powmu=1.)
 
     elif kind == 'warp':
         nx, ny = 1024, 1024
