@@ -8,6 +8,19 @@ from matplotlib import colormaps
 from transforms import ToSpherical, Normalize
 
 
+def plot(x, y, ax, lim=50, **kwargs):
+    dx = x[1:] - x[:-1]
+    dy = y[1:] - y[:-1]
+    dl = np.sqrt(dx ** 2 + dy ** 2)
+    t = np.where(dl > lim)[0]
+
+    if len(t) > 0:
+        plot(x[:t[0] + 1], y[:t[0] + 1], ax, **kwargs)
+        plot(x[t[0] + 1:], y[t[0] + 1:], ax, **kwargs)
+    else:
+        ax.plot(x, y, **kwargs)
+
+
 def show_data(data, view, title='', label=r'$B_{los}$, G', figsize=(10,10), cmap='hmimag', vmin=-200, vmax=200,
               grid_alpha=0.5, grid_color='black', text_alpha=0.7, text_color='black',
               to_file=None, to_folder=None):
@@ -30,13 +43,13 @@ def show_data(data, view, title='', label=r'$B_{los}$, G', figsize=(10,10), cmap
             ls = '-'
         else:
             ls = '--'
-        ax.plot(grid[1], grid[0], color=grid_color, ls=ls, lw=0.5, alpha=grid_alpha)
+        plot(grid[1], grid[0], ax, color=grid_color, ls=ls, lw=0.5, alpha=grid_alpha)
         ax.annotate(str(phi), (grid[1][90], grid[0][90]), color=text_color, alpha=text_alpha, size=8)
 
     for theta in range(-90,91,15):
         phi = np.arange(0,361)
         grid = transform(theta * np.ones_like(phi), phi, 1)[:2]
-        ax.plot(grid[1], grid[0], color=grid_color, ls='--', lw=0.5, alpha=grid_alpha)
+        plot(grid[1], grid[0], ax, color=grid_color, ls='--', lw=0.5, alpha=grid_alpha)
 
         if theta != 0:
             ax.annotate(str(theta), (grid[1][0], grid[0][0]), color=text_color, alpha=text_alpha, size=8)

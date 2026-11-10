@@ -297,13 +297,18 @@ class MuFilter(Transform):
 
 class ToSpherical(Transform):
 
-    def __init__(self, sine=False, inv=False):
+    def __init__(self, sine=False, cassini=False, inv=False):
         self.sine = sine
+        self.cassini = cassini
         self.inv = inv
 
     def __call__(self, *args):
         if not self.inv:
             x, y, z = args[:3]
+
+            if self.cassini:
+                x, y = y, x
+
             if self.sine:
                 theta = y * 90
             else:
@@ -319,11 +324,15 @@ class ToSpherical(Transform):
             a = np.sqrt(1 - y ** 2)
             x, z = (a * np.sin(phi * np.pi / 180),
                     a * np.cos(phi * np.pi / 180))
+
+            if self.cassini:
+                x, y = y, x
+
             return (x, y, z) + args[2:]
 
     def __repr__(self):
-        return f'ToSpherical(sine:{self.sine}, inv:{self.inv})'
+        return f'ToSpherical(sine:{self.sine}, cassini:{self.cassini}, inv:{self.inv})'
 
     def __invert__(self):
-        return ToSpherical(self.sine, not self.inv)
+        return ToSpherical(self.sine, self.cassini, not self.inv)
 

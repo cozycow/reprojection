@@ -61,14 +61,16 @@ class ViewBase(ABC):
 
 
 class Map(ViewBase):
-    def __init__(self, nx, ny, sine=False):
+    def __init__(self, nx, ny, sine=False, cassini=False):
         self.nx = nx
         self.ny = ny
         self.sine = sine
+        self.cassini = cassini
 
     def transform(self, **kwargs):
         transform = (Normalize(((self.nx - 1) / 2, 0), ((self.nx - 1) / 180, self.ny / 360)) -
-                     ToSpherical(self.sine))
+                     ToSpherical(self.sine, self.cassini)
+                     )
         return transform
 
     @property

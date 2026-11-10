@@ -90,8 +90,6 @@ def make_map(files,
 
         data, x, y, alpha = data
         data /= alpha
-
-        x, y = (x + x0 - 1024) / 1024, (y + y0 - 1024) / 1024
         z = 1 / alpha
         n = (~np.isnan(data)).astype(float)
 
@@ -107,6 +105,7 @@ def make_map(files,
         LL += np.nan_to_num((ll - LL) * w)
 
         if correct_bias:
+            x, y = (x + x0 - 1024) / 1024, (y + y0 - 1024) / 1024
             g = np.moveaxis(np.array([[x, y, n]]), (0, 1), (-2, -1))
 
             gg = np.swapaxes(g, -2, -1) @ g
