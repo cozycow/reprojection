@@ -52,6 +52,7 @@ def reproject(data, header,
 def make_map(files,
              correct_crota=True,
              binning=1,
+             correct_bias=False,
              return_variance=False,
              **kwargs):
     '''
@@ -60,14 +61,10 @@ def make_map(files,
 
     from utils import rebin
 
-    coverage = 0
-    mean_data = 0
-    mean_mu = 0
-    var_mu = 0
-    var_data = 0
-    cov_data_mu = 0
+    N, LF, LL = 0, 0, 0
+    LL, GG, LG, FF, GF = 0, 0, 0, 0, 0
 
-    map = None
+    view_out = None
 
     for file in files:
         with fits.open(file) as hdul:
@@ -84,32 +81,64 @@ def make_map(files,
                     header['CROTA'] = header['CROTA'] + 0.25 ### crota correction
 
         data = rebin(data, binning, update_header=header)
-        data, view = reproject(data, header, return_alpha=True, **kwargs)
-        data, alpha = data
-        data = data / alpha
-        mu = 1 / alpha
 
-        if map is None:
-            map = view.copy()
+        x0, y0 = header['PXBEG2'] - 1, header['PXBEG1'] - 1
 
-        weight = (~np.isnan(data)).astype(float)
-        coverage += np.nan_to_num(weight)
+        data, view = reproject(data, header, full_output=True, **kwargs)
+        if view_out is None:
+            view_out = view.copy()
 
-        cov_data_mu += np.nan_to_num((data * mu - cov_data_mu) * weight / coverage)
-        var_mu += np.nan_to_num((mu ** 2 - var_mu) * weight / coverage)
+        data, x, y, alpha = data
+        data /= alpha
 
-        if return_variance:
-            mean_mu += np.nan_to_num((mu - mean_mu) * weight / coverage)
-            mean_data += np.nan_to_num((data - mean_data) * weight / coverage)
-            var_data += np.nan_to_num((data ** 2 - var_data) * weight / coverage)
+        x, y = (x + x0 - 1024) / 1024, (y + y0 - 1024) / 1024
+        z = 1 / alpha
+        n = (~np.isnan(data)).astype(float)
 
+        N += np.nan_to_num(n)
+        w = np.expand_dims(n / N, (-2, -1))
 
-    beta = cov_data_mu / var_mu
-    beta[coverage == 0] = np.nan
+        f = np.expand_dims(data, (-2, -1))
+        l = np.expand_dims(z, (-2, -1))
+        ll = np.swapaxes(l, -2, -1) @ l
+        lf = np.swapaxes(l, -2, -1) @ f
 
-    if return_variance:
-        variance = ((var_data - mean_data ** 2) - beta ** 2 * (var_mu - mean_mu ** 2)) / var_mu / (coverage - 1)
-        beta = np.array([beta, variance])
+        LF += np.nan_to_num((lf - LF) * w)
+        LL += np.nan_to_num((ll - LL) * w)
 
-    return beta, map
+        if correct_bias:
+            g = np.moveaxis(np.array([[x, y, n]]), (0, 1), (-2, -1))
+
+            gg = np.swapaxes(g, -2, -1) @ g
+            lg = np.swapaxes(l, -2, -1) @ g
+            gf = np.swapaxes(g, -2, -1) @ f
+            ff = np.swapaxes(f, -2, -1) @ f
+
+            GG += np.nan_to_num((gg - GG) * w)
+            LG += np.nan_to_num((lg - LG) * w)
+            GF += np.nan_to_num((gf - GF) * w)
+            FF += np.nan_to_num((ff - FF) * w)
+
+    LL[N == 0] = np.nan
+    LF[N == 0] = np.nan
+    LLi = np.linalg.inv(LL)
+    Q = LLi @ LF
+
+    if correct_bias:
+        GG[N == 0] = np.nan
+        LG[N == 0] = np.nan
+        GF[N == 0] = np.nan
+        FF[N == 0] = np.nan
+        N[N == 0] = np.nan
+
+        R = LLi @ LG
+        GL = np.swapaxes(LG, -2, -1)
+        S = (FF - GF[:, :, -1:, :] ** 2 - Q ** 2 * (LL - GL[:, :, -1:, :] ** 2)) / LL / np.expand_dims(N - 1, (-1, -2))
+        D = np.linalg.inv(np.nanmean((GG - GL @ R) / S, axis=(0, 1)))
+        V = np.nanmean((GF - GL @ Q) / S, axis=(0, 1))
+        P = D @ V
+        dQ = R @ P
+        Q -= dQ
+
+    return np.squeeze(Q), view_out
 

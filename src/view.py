@@ -48,14 +48,14 @@ class ViewBase(ABC):
     def transform(self, **kwargs):
         pass
 
-    def reproject(self, image, view, return_alpha=False, **kwargs):
+    def reproject(self, image, view, full_output=False, **kwargs):
         transform = self.transform(**kwargs) - view.transform(**kwargs)
         xi, yi, alpha = transform(*self.grid, 1)
 
         image_ = map_coordinates(np.nan_to_num(image), (xi, yi), cval=np.nan) * alpha
 
-        if return_alpha:
-            image_ = np.array([image_, alpha])
+        if full_output:
+            image_ = np.array([image_, xi, yi, alpha])
 
         return image_
 
@@ -295,7 +295,6 @@ class View(ViewBase):
                      rot)
 
         if correct_dr:
-            print(self.crln, self.cdn)
             #transform -= DiffRotate(diff_rot, self.cdn - tdel)
             transform -= DiffRotate(diff_rot2, delta=self.mean_crln, wsyn=self.wsyn)
             #transform -= DiffRotate(diff_rot2, delta=self.crln, wsyn=WSYN)

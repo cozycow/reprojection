@@ -25,7 +25,7 @@ def show_data(data, view, title='', label=r'$B_{los}$, G', figsize=(10,10), cmap
 
     for phi in range(0,360,15):
         theta = np.arange(-90,91)
-        grid = transform(theta, phi * np.ones_like(theta), 1)[:-1]
+        grid = transform(theta, phi * np.ones_like(theta), 1)[:2]
         if phi == 0:
             ls = '-'
         else:
@@ -35,7 +35,7 @@ def show_data(data, view, title='', label=r'$B_{los}$, G', figsize=(10,10), cmap
 
     for theta in range(-90,91,15):
         phi = np.arange(0,361)
-        grid = transform(theta * np.ones_like(phi), phi, 1)[:-1]
+        grid = transform(theta * np.ones_like(phi), phi, 1)[:2]
         ax.plot(grid[1], grid[0], color=grid_color, ls='--', lw=0.5, alpha=grid_alpha)
 
         if theta != 0:
