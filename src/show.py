@@ -90,6 +90,9 @@ def show_data(data, view, title='', label=r'$B_{los}$, G', dpi=120, cmap='hmimag
             theta0 = 0.
         else:
             theta0 = -89.9
+            ax.set_xlabel('Longitude, deg', labelpad=10)
+            ax.set_ylabel('Latitude, deg', labelpad=10)
+
         cut_labels = False
         ha, va = 'right', 'top'
         bbox = dict(facecolor='white', edgecolor='white', alpha=0.)
