@@ -10,7 +10,7 @@ from transforms import ToSpherical
 from view import *
 
 
-def plot(x, y, ax, lim=50, label=None, **kwargs):
+def plot(x, y, ax, lim=50, label=None, bbox=None, **kwargs):
     x = x[~np.isnan(x)]
     y = y[~np.isnan(y)]
 
@@ -23,8 +23,10 @@ def plot(x, y, ax, lim=50, label=None, **kwargs):
         plot(x[:t[0] + 1], y[:t[0] + 1], ax, **kwargs)
         plot(x[t[0] + 1:], y[t[0] + 1:], ax, **kwargs)
 
-        ax.annotate(label, (x[t[0]], y[t[0]]), color='black', alpha=1, size=8, ha='center', va='center')
-        ax.annotate(label, (x[t[0] + 1], y[t[0] + 1]), color='black', alpha=1, size=8, ha='center', va='center')
+        ax.annotate(label, (x[t[0]], y[t[0]]), color='black', alpha=1, size=7,
+                    ha='center', va='center', bbox=bbox)
+        ax.annotate(label, (x[t[0] + 1], y[t[0] + 1]), color='black', alpha=1, size=7,
+                    ha='center', va='center', bbox=bbox)
     else:
         ax.plot(x, y, **kwargs)
 
@@ -52,53 +54,70 @@ def draw_colorbar(fig, ax, im, label=None, loc='upper right'):
 
 
 def show_data(data, view, title='', label=r'$B_{los}$, G', dpi=120, cmap='hmimag', vmin=-200, vmax=200,
-              grid_alpha=0.5, grid_color='black', text_alpha=0.7, text_color='black', cbloc='upper right',
+              grid_alpha=0.5, grid_color='black', cbloc='upper right',
               to_file=None, to_folder=None):
 
     if to_file is not None or to_folder is not None:
         plt.ioff()
 
-    transform = ~(view.transform() + ToSpherical())
-
     fig, ax = plt.subplots(figsize=(view.ny / dpi, view.nx / dpi))
-    ax.axis('off')
     ax.set_title(title, size=16)
     image = ax.imshow(data, origin='lower', cmap=cmap, vmin=vmin, vmax=vmax)
     draw_colorbar(fig, ax, image, label=label, loc=cbloc)
 
     if isinstance(view, View):
+        ax.axis('off')
         ax.add_patch(Circle((view.yc, view.xc), radius=view.rsun, color='black', lw=0.5, fill=False)) # limb
+
+        theta0 = 0.
+        cut_labels = True
+        ha, va = 'center', 'center'
+        bbox = dict(boxstyle='square,pad=0.', facecolor='white', edgecolor='white', alpha=0.7)
+
+    elif isinstance(view, Map):
+        ax.tick_params(
+            axis='both',
+            which='both',
+            bottom=False,
+            top=False,
+            left=False,
+            right=False,
+            labelbottom=False,
+            labelleft=False,
+        )
+
+        if view.cassini:
+            theta0 = 0.
+        else:
+            theta0 = -89.9
+        cut_labels = False
+        ha, va = 'right', 'top'
+        bbox = dict(facecolor='white', edgecolor='white', alpha=0.)
+
     else:
-        ax.add_patch(Rectangle((0,0), width=view.ny-1, height=view.nx-1, color='black', lw=0.5, fill=False))
+        theta0 = np.nan
+        cut_labels = False
+        ha, va = 'right', 'top'
+        bbox = dict(facecolor='white', edgecolor='white', alpha=0.)
 
-
+    transform = ~(view.transform() + ToSpherical())
     for phi in range(0,360,15):
         theta = np.arange(-90,91)
         grid = transform(theta, phi * np.ones_like(theta), 1)
         plot(grid[1], grid[0], ax, color=grid_color, ls='--', lw=0.5, alpha=grid_alpha)
-
-        if isinstance(view, View):
-            theta0 = 0.
-        elif isinstance(view, Map):
-            if view.cassini:
-                theta0 = 0.
-            else:
-                theta0 = -89.9
-        else:
-            theta0 = np.nan
         grid = transform(theta0, phi, 1)
 
-        ax.annotate(str(phi) if phi != 0 else None, (grid[1], grid[0]), color=text_color, alpha=text_alpha,
-                    size=8, ha='right', va='top')
+        ax.annotate(str(phi) if phi != 0 else None, (grid[1], grid[0]),
+                    size=7, ha=ha, va=va, bbox=bbox)
 
     for theta in range(-90,91,15):
         phi = np.arange(0,360)
         grid = transform(theta * np.ones_like(phi), phi, 1)
         plot(grid[1], grid[0], ax, color=grid_color, ls='--', lw=0.5, alpha=grid_alpha,
-             label=str(theta) if isinstance(view, View) and theta != 0 else None)
+             label=str(theta) if cut_labels and theta != 0 else None, bbox=bbox)
 
-        ax.annotate(str(theta), (grid[1][0], grid[0][0]), color=text_color, alpha=text_alpha,
-                    size=8, ha='right', va='top')
+        ax.annotate(str(theta), (grid[1][0], grid[0][0]),
+                    size=7, ha=ha, va=va, bbox=bbox)
 
     plt.tight_layout()
 
