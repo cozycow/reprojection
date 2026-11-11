@@ -223,8 +223,12 @@ class To3d(Transform):
             y, x = args[:2]
             z = 1 - x ** 2 - y ** 2
 
-            t = np.where(z < 0)
-            x[t], y[t], z[t] = np.nan, np.nan, np.nan
+            if isinstance(z, np.ndarray) and len(z) > 0:
+                t = np.where(z < 0)
+                x[t], y[t], z[t] = np.nan, np.nan, np.nan
+            elif z < 0:
+                x, y, z = np.nan, np.nan, np.nan
+
             z = np.sqrt(z)
             return (x, y, z) + args[2:]
         else:
@@ -287,8 +291,13 @@ class MuFilter(Transform):
         x, y, z, alpha = args
         q = np.sin(self.theta * np.pi / 180)
         mu = (z - q) / np.sqrt(q ** 2 - 2 * q * z + 1)
-        t = np.where(mu < self.minmu)
-        x[t], y[t], z[t], mu[t] = np.nan, np.nan, np.nan, np.nan
+
+        if isinstance(mu, np.ndarray) and len(mu) > 0:
+            t = np.where(mu < self.minmu)
+            x[t], y[t], z[t], mu[t] = np.nan, np.nan, np.nan, np.nan
+        elif mu < self.minmu:
+            x, y, z, mu = np.nan, np.nan, np.nan, np.nan
+
         return x, y, z, alpha * mu ** self.pow
 
     def __invert__(self):

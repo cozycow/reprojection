@@ -36,7 +36,7 @@ def reproject(data, header,
         nx, ny = 1024, 1024
         xc, yc = (nx - 1) / 2, (ny - 1) / 2
         rsun = 0.45 * nx
-        view_new = View(nx, ny, xc, yc, rsun, 0, 0, 90,
+        view_new = View(nx, ny, xc, yc, rsun, 0, 0, 0,
                         rsun_deg=-45, vw=np.inf, date=view.date, powmu=1.)
 
     else:
