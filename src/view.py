@@ -288,7 +288,7 @@ class View(ViewBase):
                      rot)
 
         if correct_dr:
-            #transform -= DiffRotate(diff_rot, self.cdn - tdel)
+            #transform -= DiffRotate(diff_rot, self.cdn, wsid=self.wsid)
             transform -= DiffRotate(diff_rot2, delta=self.mean_crln, wsyn=self.wsyn, wsid=self.wsid)
 
         return transform

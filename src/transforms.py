@@ -205,7 +205,7 @@ class DiffRotate(Transform):
     def __add__(self, other):
         if (isinstance(other, type(self)) and (self.func == other.func) and
             all(self.kwargs[key] == other.kwargs[key] for key in self.kwargs.keys())):
-            return type(self)(self.time + other.time, self.func, **self.kwargs)
+            return type(self)(self.func, self.time + other.time, **self.kwargs)
         else:
             return super().__add__(other)
 
