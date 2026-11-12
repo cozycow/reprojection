@@ -6,10 +6,11 @@ from view import View, Map
 def reproject(data, header,
               header_new=None,
               kind='',
-              mu_thr=0.1,
+              minmu=0.1,
+              wsid = 360 / 25.38,
               **kwargs):
 
-    view = View.from_header(header).update(minmu=mu_thr)
+    view = View.from_header(header).update(minmu=minmu, wsid=wsid)
 
     if header_new is not None:
         view_new = View.from_header(header_new)

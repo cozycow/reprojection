@@ -81,7 +81,7 @@ class Map(ViewBase):
 
 class View(ViewBase):
     def __init__(self, nx, ny, xc, yc, rsun, crota, crlt, crln, hgln=0.,
-                 vr=0., vw=0., vn=0., rsun_deg=0., dsun=AU, date='', minmu=0., powmu=0.):
+                 vr=0., vw=0., vn=0., rsun_deg=0., dsun=AU, date='', minmu=0., powmu=0., wsid=WSID):
         '''
         A WCS information container.
         '''
@@ -102,6 +102,7 @@ class View(ViewBase):
         self.date = date
         self.minmu = minmu
         self.powmu = powmu
+        self.wsid = wsid
 
 
     @classmethod
@@ -226,10 +227,8 @@ class View(ViewBase):
     @property
     def cdn(self):
         from datetime import datetime
-
         date = datetime.fromisoformat(self.date)
         date0 = datetime(1853, 11, 9, 0, 0, 0)
-
         return (date - date0).total_seconds() / 24 / 60 / 60
 
     @property
@@ -259,7 +258,12 @@ class View(ViewBase):
     def wsyn(self):
         a, e, theta = self.keplerian_elements
         wobs = np.sqrt(ALPHA / a ** 3) * 180 / np.pi * 24 * 3600
-        return WSID - wobs
+        return self.wsid - wobs
+
+    @property
+    def _crln(self):
+        tdel = (AU - self.dsun) / CLIGHT / 24 / 3600
+        return self.crln - (self.wsid - WSID) * self.cdn + tdel * self.wsid
 
     @property
     def mean_crln(self):
@@ -267,19 +271,9 @@ class View(ViewBase):
         M = self.mean_anomaly
 
         axis_obs = (-self.vn, self.vw, 0)
-        rot = Rotate.from_axis_angle(axis_obs, -theta) - Rotate.x(self.crlt) + Rotate.y(self.crln)
+        rot = Rotate.from_axis_angle(axis_obs, -theta) - Rotate.x(self.crlt) + Rotate.y(self._crln)
         r = rot(0, 0, 1)
         return (M + np.arctan2(r[0], r[2]) * 180 / np.pi) % 360
-
-    @property
-    def _mean_crln(self):
-        axis_obs = (-self.vn, self.vw, 0)
-
-        theta = np.arctan2(np.sqrt(self.vw ** 2 + self.vn ** 2) * np.sin(self.crlt * np.pi / 180),
-                           self.vn * np.cos(self.crlt * np.pi / 180)) * 180 / np.pi
-        rot = Rotate.from_axis_angle(axis_obs, -theta) - Rotate.x(self.crlt) + Rotate.y(self.crln)
-        r = rot(0, 0, 1)
-        return (theta + np.arctan2(r[0], r[2]) * 180 / np.pi) % 360
 
     def to_heliographic(self, **kwargs):
         return (Normalize((self.xc, self.yc), (self.rsun, self.rsun)) +
@@ -289,16 +283,12 @@ class View(ViewBase):
                 Rotate.z(self.crota))
 
     def transform(self, correct_dr=False, **kwargs):
-        tdel = (AU - self.dsun) / CLIGHT / 24 / 3600
-        crln = self.crln + tdel * WSID
-
-        rot = ~Rotate.x(self.crlt) + Rotate.y(crln)
+        rot = ~Rotate.x(self.crlt) + Rotate.y(self._crln)
         transform = (self.to_heliographic(**kwargs) +
                      rot)
 
         if correct_dr:
             #transform -= DiffRotate(diff_rot, self.cdn - tdel)
-            transform -= DiffRotate(diff_rot2, delta=self.mean_crln, wsyn=self.wsyn)
-            #transform -= DiffRotate(diff_rot2, delta=self.crln, wsyn=WSYN)
+            transform -= DiffRotate(diff_rot2, delta=self.mean_crln, wsyn=self.wsyn, wsid=self.wsid)
 
         return transform

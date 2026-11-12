@@ -146,7 +146,7 @@ class Rotate(Transform):
     def from_axis_angle(cls, axis, angle):
         axis = np.array(axis).astype(np.float32)
         axis /= np.linalg.norm(axis, axis=0) + 1e-16
-        angle = np.expand_dims(np.array(angle), 0).astype(np.float32)
+        angle = np.expand_dims(np.array(angle % 360), 0).astype(np.float32)
 
         while len(axis.shape) < len(angle.shape):
             axis = np.expand_dims(axis, -1)
