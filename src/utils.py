@@ -25,7 +25,7 @@ def rebin(image, k, axis=None, update_header=None):
     else:
         out = []
         for i in range(len(image)):
-            out.append(rebin(image[i], k, axis=axis))
+            out.append(rebin(image[i], k, axis=axis-1))
         return np.array(out)
 
 

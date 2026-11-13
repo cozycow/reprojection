@@ -54,7 +54,7 @@ def make_map(files,
              correct_crota=True,
              binning=1,
              correct_bias=False,
-             return_variance=False,
+             full_output=False,
              **kwargs):
     '''
     Creates an averaged map by applying 'remap' routine to every dataset in files
@@ -108,37 +108,43 @@ def make_map(files,
         if correct_bias:
             x, y = (x + x0 - 1024) / 1024, (y + y0 - 1024) / 1024
             g = np.moveaxis(np.array([[x, y, n]]), (0, 1), (-2, -1))
+        else:
+            g = np.moveaxis(np.array([[n]]), (0, 1), (-2, -1))
 
-            gg = np.swapaxes(g, -2, -1) @ g
-            lg = np.swapaxes(l, -2, -1) @ g
-            gf = np.swapaxes(g, -2, -1) @ f
-            ff = np.swapaxes(f, -2, -1) @ f
+        gg = np.swapaxes(g, -2, -1) @ g
+        lg = np.swapaxes(l, -2, -1) @ g
+        gf = np.swapaxes(g, -2, -1) @ f
+        ff = np.swapaxes(f, -2, -1) @ f
 
-            GG += np.nan_to_num((gg - GG) * w)
-            LG += np.nan_to_num((lg - LG) * w)
-            GF += np.nan_to_num((gf - GF) * w)
-            FF += np.nan_to_num((ff - FF) * w)
+        GG += np.nan_to_num((gg - GG) * w)
+        LG += np.nan_to_num((lg - LG) * w)
+        GF += np.nan_to_num((gf - GF) * w)
+        FF += np.nan_to_num((ff - FF) * w)
 
     LL[N == 0] = np.nan
     LF[N == 0] = np.nan
+    GG[N == 0] = np.nan
+    LG[N == 0] = np.nan
+    GF[N == 0] = np.nan
+    FF[N == 0] = np.nan
+    N[N == 0] = np.nan
+
+    GL = np.swapaxes(LG, -2, -1)
     LLi = np.linalg.inv(LL)
     Q = LLi @ LF
+    S = (FF - GF[:, :, -1:, :] ** 2 - Q ** 2 * (LL - GL[:, :, -1:, :] ** 2)) / LL / np.expand_dims(N - 1, (-1, -2))
 
     if correct_bias:
-        GG[N == 0] = np.nan
-        LG[N == 0] = np.nan
-        GF[N == 0] = np.nan
-        FF[N == 0] = np.nan
-        N[N == 0] = np.nan
-
         R = LLi @ LG
-        GL = np.swapaxes(LG, -2, -1)
-        S = (FF - GF[:, :, -1:, :] ** 2 - Q ** 2 * (LL - GL[:, :, -1:, :] ** 2)) / LL / np.expand_dims(N - 1, (-1, -2))
         D = np.linalg.inv(np.nanmean((GG - GL @ R) / S, axis=(0, 1)))
         V = np.nanmean((GF - GL @ Q) / S, axis=(0, 1))
         P = D @ V
         dQ = R @ P
         Q -= dQ
 
-    return np.squeeze(Q), view_out
+    out = np.squeeze(Q)
+    if full_output:
+        out = np.array([out, np.squeeze(S), N])
+
+    return out, view_out
 
