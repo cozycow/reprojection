@@ -49,7 +49,7 @@ class ViewBase(ABC):
         pass
 
     def reproject(self, image, view, full_output=False, **kwargs):
-        transform = self.transform(**kwargs) - view.transform(**kwargs)
+        transform = self.transform(**kwargs) + CRNFilter(view.date, 2314) - view.transform(**kwargs)
         xi, yi, alpha = transform(*self.grid, 1)
 
         image_ = map_coordinates(np.nan_to_num(image), (xi, yi), cval=np.nan) * alpha

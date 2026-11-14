@@ -8,7 +8,7 @@
       <excludeFolder url="file://$MODULE_DIR$/polar_map/png" />
       <excludeFolder url="file://$MODULE_DIR$/polar_map/temp" />
     </content>
-    <orderEntry type="jdk" jdkName="$USER_HOME$/miniconda3 (2)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Python 3.14 (base)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
 </module>

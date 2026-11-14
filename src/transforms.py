@@ -304,6 +304,38 @@ class MuFilter(Transform):
         return type(self)(self.minmu, self.theta, -self.pow)
 
 
+class CRNFilter(Transform):
+
+    def __init__(self, date, crn):
+        self.date = date
+        self.crn = crn
+
+    def __repr__(self):
+        return f'CRNFilter(date:{self.date}, crn:{self.crn})'
+
+    def __call__(self, *args):
+        from datetime import datetime
+
+        x, y, z, alpha = args
+        phi = np.arctan2(x, z) * 180 / np.pi % 360
+        dt = (datetime.fromisoformat(self.date) -
+              datetime(1853, 11, 9, 0, 0, 0))
+
+        cdn = dt.total_seconds() / 24 / 3600
+        crn = cdn / 27.2753 + 1
+
+        delta = crn + phi / 360
+        delta -= np.round(delta)
+        crn = np.floor(crn - delta)
+        t = np.where(crn != self.crn)
+        x[t], y[t], z[t], alpha[t] = np.nan, np.nan, np.nan, np.nan
+
+        return x, y, z, alpha
+
+    def __invert__(self):
+        return self
+
+
 class ToSpherical(Transform):
 
     def __init__(self, sine=False, cassini=False, inv=False):

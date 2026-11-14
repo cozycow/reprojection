@@ -4,7 +4,7 @@ from os import path
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle, Rectangle
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
-import sunpy.visualization.colormaps as cm
+#import sunpy.visualization.colormaps as cm
 from matplotlib import colormaps
 from transforms import ToSpherical
 from view import *
