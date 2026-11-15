@@ -1,50 +1,60 @@
 import numpy as np
 from astropy.io import fits
 from view import View, Map
-
+from transforms import CRNFilter, DiffRotate
+from diff_rot import *
 
 def reproject(data, header,
               header_new=None,
               kind='',
               minmu=0.1,
-              wsid = 360 / 25.38,
+              car_rot=1,
               **kwargs):
 
-    view = View.from_header(header).update(minmu=minmu, wsid=wsid)
+    view = View.from_header(header)
 
     if header_new is not None:
         view_new = View.from_header(header_new)
-
     elif kind == 'synoptic':
         nx, ny = 720, 1800
         view_new = Map(nx, ny, sine=True)
+    else:
+        view_new = view.copy()
 
-    elif kind == 'north':
+    if kind == 'north':
         nx, ny = 1024, 1024
         xc, yc = (nx - 1) / 2, (ny - 1) / 2
         rsun = 0.45 * nx
-        view_new = View(nx, ny, xc, yc, rsun, -90, 90, 0,
-                        vw=np.inf, date=view.date, minmu=-1e-8, powmu=1.)
+
+        view_new.update(inplace=True, nx=nx, ny=ny, xc=xc, yc=yc, rsun=rsun, rsun_deg=0,
+                        crota=-90, crlt=90, crln=0, minmu=-1e-8, powmu=1.)
+        #view_new = View(nx, ny, xc, yc, rsun, -90, 90, 0,
+        #                vw=np.inf, date=view.date, minmu=-1e-8, powmu=1.)
 
     elif kind == 'south':
         nx, ny = 1024, 1024
         xc, yc = (nx - 1) / 2, (ny - 1) / 2
         rsun = 0.45 * nx
-        view_new = View(nx, ny, xc, yc, rsun, 90, -90, 0,
-                        vw=np.inf, date=view.date, minmu=-1e-8, powmu=1.)
+
+        view_new.update(inplace=True, nx=nx, ny=ny, xc=xc, yc=yc, rsun=rsun, rsun_deg=0,
+                        crota=90, crlt=-90, crln=0, minmu=-1e-8, powmu=1.)
+        #view_new = View(nx, ny, xc, yc, rsun, 90, -90, 0,
+        #                vw=np.inf, date=view.date, minmu=-1e-8, powmu=1.)
 
     elif kind == 'warp':
         nx, ny = 1024, 1024
         xc, yc = (nx - 1) / 2, (ny - 1) / 2
         rsun = 0.45 * nx
-        view_new = View(nx, ny, xc, yc, rsun, 0, 0, 0,
-                        rsun_deg=-45, vw=np.inf, date=view.date, powmu=1.)
 
-    else:
-        view_new = view.copy()
+        view_new.update(inplace=True, nx=nx, ny=ny, xc=xc, yc=yc, rsun=rsun,
+                        crota=0, crlt=0, crln=0, minmu=-1e-8, powmu=1.,
+                        rsun_deg=-45)
+        #view_new = View(nx, ny, xc, yc, rsun, 0, 0, 0,
+        #                rsun_deg=-45, vw=np.inf, date=view.date, powmu=1.)
+    Q = CRNFilter(car_rot, view_new.date) - DiffRotate(diff_rot3, date=view_new.date)
 
     view_new.update(inplace=True, **kwargs)
-    data_ = view_new.reproject(data, view, **kwargs)
+    data_ = view_new.reproject(data, view.update(minmu=minmu), Q, **kwargs)
 
     return data_, view_new
 

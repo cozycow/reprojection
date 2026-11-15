@@ -168,44 +168,12 @@ class Rotate(Transform):
         axis = [0, 0, 1]
         return cls.from_axis_angle(axis, angle)
 
-    def __call__(self, *args):
-        return tuple(np.squeeze((self * type(self)(0, *args[:3]) * (~self)).u)) + args[3:]
+    def __call__(self, x, y, z, *args):
+        return tuple(np.squeeze((self * type(self)(0, x, y, z) * (~self)).u)) + args
 
     def __add__(self, other):
         if isinstance(other, type(self)):
             return other * self
-        else:
-            return super().__add__(other)
-
-
-class DiffRotate(Transform):
-
-    def __new__(cls, *args, **kwargs):
-        if args[0] == 0.:
-            return Pipe()
-        else:
-            return super().__new__(cls)
-
-    def __init__(self, func, time=1, **kwargs):
-        self.func = func
-        self.time = time
-        self.kwargs = kwargs
-
-    def __repr__(self):
-        return f'CorrectDR(jdn:{self.time})'
-
-    def __call__(self, *args):
-        W = self.func(args[:3], **self.kwargs)
-        rot = Rotate.y(W * self.time)
-        return rot(*args)
-
-    def __invert__(self):
-        return type(self)(self.func, -self.time, **self.kwargs)
-
-    def __add__(self, other):
-        if (isinstance(other, type(self)) and (self.func == other.func) and
-            all(self.kwargs[key] == other.kwargs[key] for key in self.kwargs.keys())):
-            return type(self)(self.func, self.time + other.time, **self.kwargs)
         else:
             return super().__add__(other)
 
@@ -253,16 +221,14 @@ class ToParaxial(Transform):
     def __repr__(self):
         return f'ToParaxial(theta:{self.theta})'
 
-    def __call__(self, *args):
-        x, y, z = args[:3]
-
+    def __call__(self, x, y, z, *args):
         q = np.sin(self.theta * np.pi / 180)
         p = 1 / (1 + q * z)
 
         u = np.sqrt(1 - q ** 2) * p
         x, y = x * u, y * u
         z = (z + q) * p
-        return (x, y, z) + args[3:]
+        return (x, y, z) + args
 
     def __invert__(self):
         return type(self)(-self.theta)
@@ -287,8 +253,7 @@ class MuFilter(Transform):
     def __repr__(self):
         return f'MuFilter(pow:{self.pow})'
 
-    def __call__(self, *args):
-        x, y, z, alpha = args
+    def __call__(self, x, y, z, alpha):
         q = np.sin(self.theta * np.pi / 180)
         mu = (z - q) / np.sqrt(q ** 2 - 2 * q * z + 1)
 
@@ -306,31 +271,19 @@ class MuFilter(Transform):
 
 class CRNFilter(Transform):
 
-    def __init__(self, date, crn):
-        self.date = date
+    def __init__(self, crn, date):
         self.crn = crn
+        self.date = date
 
     def __repr__(self):
-        return f'CRNFilter(date:{self.date}, crn:{self.crn})'
+        return f'CRNFilter(crn:{self.crn})'
 
-    def __call__(self, *args):
-        from datetime import datetime
-
-        x, y, z, alpha = args
-        phi = np.arctan2(x, z) * 180 / np.pi % 360
-        dt = (datetime.fromisoformat(self.date) -
-              datetime(1853, 11, 9, 0, 0, 0))
-
-        cdn = dt.total_seconds() / 24 / 3600
-        crn = cdn / 27.2753 + 1
-
-        delta = crn + phi / 360
-        delta -= np.round(delta)
-        crn = np.floor(crn - delta)
+    def __call__(self, theta, phi, alpha):
+        from diff_rot import get_crn
+        crn = get_crn(phi, self.date) // 1
         t = np.where(crn != self.crn)
-        x[t], y[t], z[t], alpha[t] = np.nan, np.nan, np.nan, np.nan
-
-        return x, y, z, alpha
+        theta[t], phi[t], alpha[t] = np.nan, np.nan, np.nan
+        return theta, phi, alpha
 
     def __invert__(self):
         return self
@@ -338,42 +291,56 @@ class CRNFilter(Transform):
 
 class ToSpherical(Transform):
 
-    def __init__(self, sine=False, cassini=False, inv=False):
-        self.sine = sine
-        self.cassini = cassini
+    def __init__(self, inv=False):
         self.inv = inv
 
     def __call__(self, *args):
         if not self.inv:
             x, y, z = args[:3]
-
-            if self.cassini:
-                x, y = y, x
-
-            if self.sine:
-                theta = y * 90
-            else:
-                theta = np.arcsin(y) * 180 / np.pi
+            theta = np.arcsin(y) * 180 / np.pi
             phi = np.arctan2(x, z) * 180 / np.pi % 360
             return (theta, phi) + args[3:]
         else:
             theta, phi = args[:2]
-            if self.sine:
-                y = theta / 90
-            else:
-                y = np.sin(theta * np.pi / 180)
+            y = np.sin(theta * np.pi / 180)
             a = np.sqrt(1 - y ** 2)
             x, z = (a * np.sin(phi * np.pi / 180),
                     a * np.cos(phi * np.pi / 180))
-
-            if self.cassini:
-                x, y = y, x
-
             return (x, y, z) + args[2:]
 
     def __repr__(self):
-        return f'ToSpherical(sine:{self.sine}, cassini:{self.cassini}, inv:{self.inv})'
+        return f'ToSpherical(inv:{self.inv})'
 
     def __invert__(self):
-        return ToSpherical(self.sine, self.cassini, not self.inv)
+        return ToSpherical(not self.inv)
 
+
+class DiffRotate(Transform):
+
+    def __new__(cls, *args, **kwargs):
+        if args[0] == 0.:
+            return Pipe()
+        else:
+            return super().__new__(cls)
+
+    def __init__(self, func, time=1, **kwargs):
+        self.func = func
+        self.time = time
+        self.kwargs = kwargs
+
+    def __repr__(self):
+        return f'CorrectDR(jdn:{self.time})'
+
+    def __call__(self, theta, phi, alpha):
+        dphi = self.func(theta, phi, **self.kwargs)
+        return theta, phi + dphi, alpha
+
+    def __invert__(self):
+        return type(self)(self.func, -self.time, **self.kwargs)
+
+    def __add__(self, other):
+        if (isinstance(other, type(self)) and (self.func == other.func) and
+            all(self.kwargs[key] == other.kwargs[key] for key in self.kwargs.keys())):
+            return type(self)(self.func, self.time + other.time, **self.kwargs)
+        else:
+            return super().__add__(other)

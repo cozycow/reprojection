@@ -48,8 +48,10 @@ class ViewBase(ABC):
     def transform(self, **kwargs):
         pass
 
-    def reproject(self, image, view, full_output=False, **kwargs):
-        transform = self.transform(**kwargs) + CRNFilter(view.date, 2314) - view.transform(**kwargs)
+    def reproject(self, image, view, Q, full_output=False, **kwargs):
+        transform = (self.transform(**kwargs) + Q
+                     #- DiffRotate(diff_rot3, date=view.date)
+                     - view.transform(**kwargs))
         xi, yi, alpha = transform(*self.grid, 1)
 
         image_ = map_coordinates(np.nan_to_num(image), (xi, yi), cval=np.nan) * alpha
@@ -61,15 +63,15 @@ class ViewBase(ABC):
 
 
 class Map(ViewBase):
-    def __init__(self, nx, ny, sine=False, cassini=False):
+    def __init__(self, nx, ny, sine=True, cassini=False):
         self.nx = nx
         self.ny = ny
         self.sine = sine
         self.cassini = cassini
 
     def transform(self, **kwargs):
-        transform = (Normalize(((self.nx - 1) / 2, 0), ((self.nx - 1) / 180, self.ny / 360)) -
-                     ToSpherical(self.sine, self.cassini)
+        transform = (Normalize(((self.nx - 1) / 2, 0), ((self.nx - 1) / 180, self.ny / 360))
+                     #-ToSpherical(self.sine, self.cassini)
                      )
         return transform
 
@@ -80,8 +82,8 @@ class Map(ViewBase):
 
 
 class View(ViewBase):
-    def __init__(self, nx, ny, xc, yc, rsun, crota, crlt, crln, hgln=0.,
-                 vr=0., vw=0., vn=0., rsun_deg=0., dsun=AU, date='', minmu=0., powmu=0., wsid=WSID):
+    def __init__(self, nx, ny, xc, yc, rsun, crota, crlt, crln, hgln=0., crn=1,
+                 vr=0., vw=0., vn=0., rsun_deg=0., dsun=AU, date='', minmu=0., powmu=0.):
         '''
         A WCS information container.
         '''
@@ -94,6 +96,7 @@ class View(ViewBase):
         self.crlt = crlt
         self.crln = crln % 360
         self.hgln = hgln % 360
+        self.crn = crn
         self.vr = vr
         self.vw = vw
         self.vn = vn
@@ -102,7 +105,6 @@ class View(ViewBase):
         self.date = date
         self.minmu = minmu
         self.powmu = powmu
-        self.wsid = wsid
 
 
     @classmethod
@@ -138,6 +140,11 @@ class View(ViewBase):
         else:
             hgln = 0.
 
+        if 'CAR_ROT' in header:
+            crn = header['CAR_ROT']
+        else:
+            crn = 1
+
         if 'OBS_VR' in header:
             vr = header['OBS_VR']
         else:
@@ -170,7 +177,7 @@ class View(ViewBase):
         else:
             date = ''
 
-        return cls(nx, ny, xc, yc, rsun, crota, crlt, crln, hgln, vr, vw, vn, rsun_deg, dsun, date, 0., 1.)
+        return cls(nx, ny, xc, yc, rsun, crota, crlt, crln, hgln, crn, vr, vw, vn, rsun_deg, dsun, date, 0., 1.)
 
     def update_header(self, header, inplace=False):
         '''
@@ -205,6 +212,9 @@ class View(ViewBase):
 
         if 'HGLN_OBS' in header_new:
             header_new['HGLN_OBS'] = self.hgln
+
+        if 'CAR_ROT' in header_new:
+            header_new['CAR_ROT'] = self.crn
 
         if 'RADIUS' in header_new:
             header_new['RADIUS'] = self.rsun
@@ -258,12 +268,12 @@ class View(ViewBase):
     def wsyn(self):
         a, e, theta = self.keplerian_elements
         wobs = np.sqrt(ALPHA / a ** 3) * 180 / np.pi * 24 * 3600
-        return self.wsid - wobs
+        return WSID - wobs
 
     @property
     def _crln(self):
         tdel = (AU - self.dsun) / CLIGHT / 24 / 3600
-        return self.crln - (self.wsid - WSID) * self.cdn + tdel * self.wsid
+        return self.crln + tdel * WSID
 
     @property
     def mean_crln(self):
@@ -271,7 +281,7 @@ class View(ViewBase):
         M = self.mean_anomaly
 
         axis_obs = (-self.vn, self.vw, 0)
-        rot = Rotate.from_axis_angle(axis_obs, -theta) - Rotate.x(self.crlt) + Rotate.y(self._crln)
+        rot = Rotate.from_axis_angle(axis_obs, -theta) - Rotate.x(self.crlt) + Rotate.y(self.crln)
         r = rot(0, 0, 1)
         return (M + np.arctan2(r[0], r[2]) * 180 / np.pi) % 360
 
@@ -283,12 +293,12 @@ class View(ViewBase):
                 Rotate.z(self.crota))
 
     def transform(self, correct_dr=False, **kwargs):
-        rot = ~Rotate.x(self.crlt) + Rotate.y(self._crln)
+        rot = ~Rotate.x(self.crlt) + Rotate.y(self.crln)
         transform = (self.to_heliographic(**kwargs) +
-                     rot)
+                     rot +
+                     ToSpherical())
 
-        if correct_dr:
-            #transform -= DiffRotate(diff_rot, self.cdn, wsid=self.wsid)
-            transform -= DiffRotate(diff_rot2, delta=self.mean_crln, wsyn=self.wsyn, wsid=self.wsid)
+        #if correct_dr:
+        #    transform += DiffRotate(diff_rot2, delta=self.mean_crln, date=self.date, wsyn=self.wsyn)
 
         return transform
