@@ -6,11 +6,9 @@ from diff_rot import *
 
 
 WSID = 360 / 25.38
-WSYN = 360 / 27.2753
 ALPHA = 1.327124e20
 AU = 149597870691.
 CLIGHT = 299792458
-RSUN = 696e8
 
 
 class ViewBase(ABC):
@@ -48,8 +46,8 @@ class ViewBase(ABC):
     def transform(self, **kwargs):
         pass
 
-    def reproject(self, image, view, *args, full_output=False, **kwargs):
-        transform = (self.transform(**kwargs) + Pipe(*args) - view.transform(**kwargs))
+    def reproject(self, image, view, *args, full_output=False):
+        transform = (self.transform + Pipe(*args) - view.transform)
         xi, yi, alpha = transform(*self.grid, 1)
 
         image_ = map_coordinates(np.nan_to_num(image), (xi, yi), cval=np.nan) * alpha
@@ -67,7 +65,8 @@ class Map(ViewBase):
         self.sine = sine
         self.cassini = cassini
 
-    def transform(self, **kwargs):
+    @property
+    def transform(self):
         transform = (Normalize(((self.nx - 1) / 2, 0), ((self.nx - 1) / 180, self.ny / 360))
                      #-ToSpherical(self.sine, self.cassini)
                      )
@@ -80,7 +79,7 @@ class Map(ViewBase):
 
 
 class View(ViewBase):
-    def __init__(self, nx, ny, xc, yc, rsun, crota, crlt, crln, hgln=0., crn=1,
+    def __init__(self, nx, ny, xc, yc, rsun, crota, crlt, crln,
                  vr=0., vw=0., vn=0., rsun_deg=0., dsun=AU, date='', minmu=0., powmu=0.):
         '''
         A WCS information container.
@@ -93,8 +92,6 @@ class View(ViewBase):
         self.crota = crota
         self.crlt = crlt
         self.crln = crln % 360
-        self.hgln = hgln % 360
-        self.crn = crn
         self.vr = vr
         self.vw = vw
         self.vn = vn
@@ -133,16 +130,6 @@ class View(ViewBase):
         else:
             crota = 0
 
-        if 'HGLN_OBS' in header:
-            hgln = header['HGLN_OBS']
-        else:
-            hgln = 0.
-
-        if 'CAR_ROT' in header:
-            crn = header['CAR_ROT']
-        else:
-            crn = 1
-
         if 'OBS_VR' in header:
             vr = header['OBS_VR']
         else:
@@ -175,7 +162,7 @@ class View(ViewBase):
         else:
             date = ''
 
-        return cls(nx, ny, xc, yc, rsun, crota, crlt, crln, hgln, crn, vr, vw, vn, rsun_deg, dsun, date, 0., 1.)
+        return cls(nx, ny, xc, yc, rsun, crota, crlt, crln, vr, vw, vn, rsun_deg, dsun, date, 0., 1.)
 
     def update_header(self, header, inplace=False):
         '''
@@ -208,12 +195,6 @@ class View(ViewBase):
         header_new['CRLT_OBS'] = self.crlt
         header_new['CRLN_OBS'] = self.crln
 
-        if 'HGLN_OBS' in header_new:
-            header_new['HGLN_OBS'] = self.hgln
-
-        if 'CAR_ROT' in header_new:
-            header_new['CAR_ROT'] = self.crn
-
         if 'RADIUS' in header_new:
             header_new['RADIUS'] = self.rsun
 
@@ -231,13 +212,6 @@ class View(ViewBase):
     def grid(self):
         grid = tuple(np.mgrid[:self.nx, :self.ny].astype(np.float32))
         return grid
-
-    @property
-    def cdn(self):
-        from datetime import datetime
-        date = datetime.fromisoformat(self.date)
-        date0 = datetime(1853, 11, 9, 0, 0, 0)
-        return (date - date0).total_seconds() / 24 / 60 / 60
 
     @property
     def keplerian_elements(self):
@@ -283,20 +257,14 @@ class View(ViewBase):
         r = rot(0, 0, 1)
         return (M + np.arctan2(r[0], r[2]) * 180 / np.pi) % 360
 
-    def to_heliographic(self, **kwargs):
+    @property
+    def transform(self):
         return (Normalize((self.xc, self.yc), (self.rsun, self.rsun)) +
                 To3d() +
                 ToParaxial(self.rsun_deg) +
                 MuFilter(self.minmu, self.rsun_deg, self.powmu) +
-                Rotate.z(self.crota))
+                Rotate.z(self.crota) -
+                Rotate.x(self.crlt) +
+                Rotate.y(self.crln) +
+                ToSpherical())
 
-    def transform(self, correct_dr=False, **kwargs):
-        rot = ~Rotate.x(self.crlt) + Rotate.y(self.crln)
-        transform = (self.to_heliographic(**kwargs) +
-                     rot +
-                     ToSpherical())
-
-        #if correct_dr:
-        #    transform += DiffRotate(diff_rot2, delta=self.mean_crln, date=self.date, wsyn=self.wsyn)
-
-        return transform

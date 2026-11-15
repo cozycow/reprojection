@@ -53,7 +53,7 @@ def reproject(data, header,
     Q = DiffRotate(view.date, car_rot, wsyn=view.wsyn, epoch='20260710T030009', crln0=207.18)
 
     view_new.update(inplace=True, **kwargs)
-    data_ = view_new.reproject(data, view.update(minmu=minmu), Q, **kwargs)
+    data_ = view_new.reproject(data, view.update(minmu=minmu), Q)
 
     return data_, view_new
 

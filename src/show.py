@@ -103,7 +103,7 @@ def show_data(data, view, title='', label=r'$B_{los}$, G', dpi=120, cmap='hmimag
         ha, va = 'right', 'top'
         bbox = dict(facecolor='white', edgecolor='white', alpha=0.)
 
-    transform = ~view.transform()# + ToSpherical())
+    transform = ~view.transform# + ToSpherical())
     for phi in range(0,360,15):
         theta = np.arange(-90,91)
         grid = transform(theta, phi * np.ones_like(theta), 1)
