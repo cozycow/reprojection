@@ -48,10 +48,8 @@ class ViewBase(ABC):
     def transform(self, **kwargs):
         pass
 
-    def reproject(self, image, view, Q, full_output=False, **kwargs):
-        transform = (self.transform(**kwargs) + Q
-                     #- DiffRotate(diff_rot3, date=view.date)
-                     - view.transform(**kwargs))
+    def reproject(self, image, view, *args, full_output=False, **kwargs):
+        transform = (self.transform(**kwargs) + Pipe(*args) - view.transform(**kwargs))
         xi, yi, alpha = transform(*self.grid, 1)
 
         image_ = map_coordinates(np.nan_to_num(image), (xi, yi), cval=np.nan) * alpha

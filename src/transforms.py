@@ -269,26 +269,6 @@ class MuFilter(Transform):
         return type(self)(self.minmu, self.theta, -self.pow)
 
 
-class CRNFilter(Transform):
-
-    def __init__(self, crn, date):
-        self.crn = crn
-        self.date = date
-
-    def __repr__(self):
-        return f'CRNFilter(crn:{self.crn})'
-
-    def __call__(self, theta, phi, alpha):
-        from diff_rot import get_crn
-        crn = get_crn(phi, self.date) // 1
-        t = np.where(crn != self.crn)
-        theta[t], phi[t], alpha[t] = np.nan, np.nan, np.nan
-        return theta, phi, alpha
-
-    def __invert__(self):
-        return self
-
-
 class ToSpherical(Transform):
 
     def __init__(self, inv=False):
@@ -314,33 +294,3 @@ class ToSpherical(Transform):
     def __invert__(self):
         return ToSpherical(not self.inv)
 
-
-class DiffRotate(Transform):
-
-    def __new__(cls, *args, **kwargs):
-        if args[0] == 0.:
-            return Pipe()
-        else:
-            return super().__new__(cls)
-
-    def __init__(self, func, time=1, **kwargs):
-        self.func = func
-        self.time = time
-        self.kwargs = kwargs
-
-    def __repr__(self):
-        return f'CorrectDR(jdn:{self.time})'
-
-    def __call__(self, theta, phi, alpha):
-        dphi = self.func(theta, phi, **self.kwargs)
-        return theta, phi + dphi, alpha
-
-    def __invert__(self):
-        return type(self)(self.func, -self.time, **self.kwargs)
-
-    def __add__(self, other):
-        if (isinstance(other, type(self)) and (self.func == other.func) and
-            all(self.kwargs[key] == other.kwargs[key] for key in self.kwargs.keys())):
-            return type(self)(self.func, self.time + other.time, **self.kwargs)
-        else:
-            return super().__add__(other)
