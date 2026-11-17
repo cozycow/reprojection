@@ -8,6 +8,7 @@ def reproject(data, header,
               kind='',
               minmu=0.1,
               car_rot=None,
+              correct_dr=False,
               **kwargs):
 
     view = View.from_header(header)
@@ -50,10 +51,13 @@ def reproject(data, header,
                         rsun_deg=-45)
         #view_new = View(nx, ny, xc, yc, rsun, 0, 0, 0,
         #                rsun_deg=-45, vw=np.inf, date=view.date, powmu=1.)
-    Q = DiffRotate(view.date, car_rot, wsyn=view.wsyn, epoch='20260710T030009', crln0=207.18)
+
+    Q = []
+    if correct_dr:
+        Q += [DiffRotate(view.date, car_rot, wsyn=view.wsyn, epoch='20260710T030009', crln0=207.18, **kwargs)]
 
     view_new.update(inplace=True, **kwargs)
-    data_ = view_new.reproject(data, view.update(minmu=minmu), Q, **kwargs)
+    data_ = view_new.reproject(data, view.update(minmu=minmu), *Q, **kwargs)
 
     return data_, view_new
 

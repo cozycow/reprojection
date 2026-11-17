@@ -4,8 +4,6 @@ from os import path
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle, Rectangle
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
-#import sunpy.visualization.colormaps as cm
-from matplotlib import colormaps
 from transforms import ToSpherical
 from view import *
 
@@ -53,7 +51,7 @@ def draw_colorbar(fig, ax, im, label=None, loc='upper right'):
     fig.colorbar(im, cax=cax, orientation='horizontal', label=label)
 
 
-def show_data(data, view, title='', label=r'$B_{los}$, G', dpi=120, cmap='hmimag', vmin=-200, vmax=200,
+def show_data(data, view, title=None, label=None, dpi=120, cmap='seismic', vmin=-200, vmax=200,
               grid_alpha=0.5, grid_color='black', cbloc='upper right',
               to_file=None, to_folder=None):
 
@@ -61,9 +59,13 @@ def show_data(data, view, title='', label=r'$B_{los}$, G', dpi=120, cmap='hmimag
         plt.ioff()
 
     fig, ax = plt.subplots(figsize=(view.ny / dpi, view.nx / dpi))
-    ax.set_title(title, size=16)
+    if title is not None:
+        ax.set_title(title, size=16)
+    elif 'date' in view.__dict__:
+        ax.set_title(view.date, size=16)
+
     image = ax.imshow(data, origin='lower', cmap=cmap, vmin=vmin, vmax=vmax)
-    draw_colorbar(fig, ax, image, label=label, loc=cbloc)
+
 
     if isinstance(view, View):
         ax.axis('off')
@@ -73,6 +75,9 @@ def show_data(data, view, title='', label=r'$B_{los}$, G', dpi=120, cmap='hmimag
         cut_labels = True
         ha, va = 'center', 'center'
         bbox = dict(boxstyle='square,pad=0.', facecolor='white', edgecolor='white', alpha=0.7)
+
+        if label is None:
+            label = r'$B_{los}$, G'
 
     elif isinstance(view, Map):
         ax.tick_params(
@@ -96,6 +101,9 @@ def show_data(data, view, title='', label=r'$B_{los}$, G', dpi=120, cmap='hmimag
         cut_labels = False
         ha, va = 'right', 'top'
         bbox = dict(facecolor='white', edgecolor='white', alpha=0.)
+
+        if label is None:
+            label = r'$B_{r}$, G'
 
     else:
         theta0 = np.nan
@@ -122,6 +130,7 @@ def show_data(data, view, title='', label=r'$B_{los}$, G', dpi=120, cmap='hmimag
         ax.annotate(str(theta), (grid[1][0], grid[0][0]),
                     size=7, ha=ha, va=va, bbox=bbox)
 
+    draw_colorbar(fig, ax, image, label=label, loc=cbloc)
     plt.tight_layout()
 
     if to_folder is not None:
