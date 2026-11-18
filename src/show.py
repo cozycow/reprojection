@@ -8,7 +8,7 @@ from transforms import ToSpherical
 from view import *
 
 
-def plot(x, y, ax, lim=50, label=None, bbox=None, **kwargs):
+def _plot(x, y, ax, lim=50, label=None, bbox=None, **kwargs):
     x = x[~np.isnan(x)]
     y = y[~np.isnan(y)]
 
@@ -27,6 +27,30 @@ def plot(x, y, ax, lim=50, label=None, bbox=None, **kwargs):
                     ha='center', va='center', bbox=bbox)
     else:
         ax.plot(x, y, **kwargs)
+
+
+def plot(x, y, ax, lim=50, label=None, bbox=None, **kwargs):
+    x = x[~np.isnan(x)]
+    y = y[~np.isnan(y)]
+
+    if len(x) > 1:
+
+        dx = np.roll(x, -1) - x
+        dy = np.roll(y, -1) - y
+        dl = np.sqrt(dx ** 2 + dy ** 2)
+
+        t = int(np.argmax(dl))
+        x = np.roll(x, -t - 1)
+        y = np.roll(y, -t - 1)
+
+        ax.plot(x, y, **kwargs)
+
+        if dl[t] > lim:
+            ax.annotate(label, (x[0], y[0]), color='black', alpha=1, size=7,
+                        ha='center', va='center', bbox=bbox)
+            ax.annotate(label, (x[-1], y[-1]), color='black', alpha=1, size=7,
+                        ha='center', va='center', bbox=bbox)
+
 
 
 def draw_colorbar(fig, ax, im, label=None, loc='upper right'):
