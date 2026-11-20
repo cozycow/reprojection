@@ -69,9 +69,11 @@ class Map(ViewBase):
 
     @property
     def transform(self):
-        transform = (Normalize(((self.nx - 1) / 2, 0), ((self.nx - 1) / 180, self.ny / 360))
-                     #-ToSpherical(self.sine, self.cassini)
-                     )
+        transform = Normalize(((self.nx - 1) / 2, 0), ((self.nx - 1) / 180, self.ny / 360))
+
+        if self.sine:
+            transform -= Sine()
+
         return transform
 
     @property
@@ -267,6 +269,6 @@ class View(ViewBase):
                 MuFilter(self.minmu, self.rsun_deg, self.powmu) +
                 Rotate.z(self.crota) -
                 Rotate.x(self.crlt) +
-                Rotate.y(self.crln) +
+                Rotate.y(self._crln) +
                 ToSpherical())
 

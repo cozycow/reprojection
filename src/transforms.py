@@ -294,3 +294,25 @@ class ToSpherical(Transform):
     def __invert__(self):
         return ToSpherical(not self.inv)
 
+
+class Sine(Transform):
+
+    def __init__(self, inv=False):
+        self.inv = inv
+
+    def __call__(self, *args):
+        if not self.inv:
+            theta, phi = args[:2]
+            theta = np.sin(theta * np.pi / 180) * 90
+            return (theta, phi) + args[2:]
+        else:
+            theta, phi = args[:2]
+            theta = np.arcsin(theta / 90) * 180 / np.pi
+            return (theta, phi) + args[2:]
+
+    def __repr__(self):
+        return f'Sine(inv:{self.inv})'
+
+    def __invert__(self):
+        return Sine(not self.inv)
+

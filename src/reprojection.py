@@ -94,6 +94,9 @@ def make_map(files,
                 if correct_crota:
                     header['CROTA'] = header['CROTA'] + 0.25 ### crota correction
 
+        #rsun = header['RSUN_ARC'] / header['CDELT1']
+        #binning = int(np.ceil(rsun / 450).clip(1))
+
         data = rebin(data, binning, update_header=header)
 
         x0, y0 = header['PXBEG2'] - 1, header['PXBEG1'] - 1
