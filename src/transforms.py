@@ -40,7 +40,7 @@ class Transform(ABC):
 
 class Pipe(Transform, list):
 
-    def __init__(self, *items, **kwargs):
+    def __init__(self, *items):
         super().__init__(items)
 
     def __call__(self, *args):
@@ -79,8 +79,8 @@ class Pipe(Transform, list):
 
 
 class Normalize(Transform):
-    def __new__(cls, *args, **kwargs):
-        if all(abs(x) == 0. for x in args[0]) and all(x == 1. for x in args[1]):
+    def __new__(cls, shift, scale):
+        if all(abs(x) == 0. for x in shift) and all(x == 1. for x in scale):
             return Pipe()
         else:
             return super().__new__(cls)
@@ -109,16 +109,16 @@ class Normalize(Transform):
 
 class Rotate(Transform):
 
-    def __new__(cls, *args, **kwargs):
-        if np.all(np.array(args[0]) == 1.):
+    def __new__(cls, arg, *args):
+        if np.all(np.array(arg) == 1.):
             return Pipe()
         else:
             return super().__new__(cls)
 
 
-    def __init__(self, *args):
-        self.w = args[0]
-        self.u = args[1:]
+    def __init__(self, arg, *args):
+        self.w = arg
+        self.u = args
 
     @property
     def axis(self):
@@ -144,32 +144,27 @@ class Rotate(Transform):
 
     @classmethod
     def from_axis_angle(cls, axis, angle):
-        axis = np.array(axis).astype(np.float32)
-        axis /= np.linalg.norm(axis, axis=0) + 1e-16
-        angle = np.expand_dims(np.array(angle % 360), 0).astype(np.float32)
-
-        while len(axis.shape) < len(angle.shape):
-            axis = np.expand_dims(axis, -1)
-
-        return cls(np.cos(angle / 2 * np.pi / 180), *(axis * np.sin(angle / 2 * np.pi / 180)))
+        sin, cos = np.sin(angle / 2 * np.pi / 180), np.cos(angle / 2 * np.pi / 180)
+        q = np.sqrt(sum(x ** 2 for x in axis))
+        return cls(cos, *(x / q * sin for x in axis))
 
     @classmethod
     def x(cls, angle):
-        axis = [1, 0, 0]
+        axis = (1, 0, 0)
         return cls.from_axis_angle(axis, angle)
 
     @classmethod
     def y(cls, angle):
-        axis = [0, 1, 0]
+        axis = (0, 1, 0)
         return cls.from_axis_angle(axis, angle)
 
     @classmethod
     def z(cls, angle):
-        axis = [0, 0, 1]
+        axis = (0, 0, 1)
         return cls.from_axis_angle(axis, angle)
 
-    def __call__(self, x, y, z, *args):
-        return tuple(np.squeeze((self * type(self)(0, x, y, z) * (~self)).u)) + args
+    def __call__(self, x, y, z):
+        return tuple((self * type(self)(0, x, y, z) * (~self)).u)
 
     def __add__(self, other):
         if isinstance(other, type(self)):
@@ -188,27 +183,18 @@ class To3d(Transform):
 
     def __call__(self, *args):
         if not self.inv:
-            y, x = args[:2]
+            x, y = args
             z = 1 - x ** 2 - y ** 2
-
             if isinstance(z, np.ndarray) and len(z) > 0:
                 t = np.where(z < 0)
                 x[t], y[t], z[t] = np.nan, np.nan, np.nan
             elif z < 0:
                 x, y, z = np.nan, np.nan, np.nan
-
             z = np.sqrt(z)
-            return (x, y, z) + args[2:]
+            return x, y, z
         else:
-            x, y, z = args[:3]
-
-            #if isinstance(z, np.ndarray) and len(z) > 0:
-            #    t = np.where(z < -1e-16)
-            #    x[t], y[t], z[t] = np.nan, np.nan, np.nan
-            #elif z < -1e-16:
-            #    x, y, z = np.nan, np.nan, np.nan
-
-            return (y, x) + args[3:]
+            x, y, z = args
+            return x, y
 
     def __invert__(self):
         return type(self)(not self.inv)
@@ -216,8 +202,8 @@ class To3d(Transform):
 
 class ToParaxial(Transform):
 
-    def __new__(cls, *args, **kwargs):
-        if args[0] == 0.:
+    def __new__(cls, theta):
+        if theta == 0.:
             return Pipe()
         else:
             return super().__new__(cls)
@@ -231,7 +217,6 @@ class ToParaxial(Transform):
     def __call__(self, x, y, z, *args):
         q = np.sin(self.theta * np.pi / 180)
         p = 1 / (1 + q * z)
-
         u = np.sqrt(1 - q ** 2) * p
         x, y = x * u, y * u
         z = (z + q) * p
@@ -252,10 +237,9 @@ class ToParaxial(Transform):
 
 class MuFilter(Transform):
 
-    def __init__(self, minmu=0., theta=0.):#, pow=1.):
+    def __init__(self, minmu=0., theta=0.):
         self.minmu = minmu
         self.theta = theta
-        #self.pow = pow
 
     def __repr__(self):
         return f'MuFilter()'
@@ -263,17 +247,15 @@ class MuFilter(Transform):
     def __call__(self, x, y, z):
         q = np.sin(self.theta * np.pi / 180)
         mu = (z - q) / np.sqrt(q ** 2 - 2 * q * z + 1)
-
         if isinstance(mu, np.ndarray) and len(mu) > 0:
             t = np.where(mu < self.minmu)
             x[t], y[t], z[t] = np.nan, np.nan, np.nan
         elif mu < self.minmu:
             x, y, z = np.nan, np.nan, np.nan
-
         return x, y, z
 
     def __invert__(self):
-        return type(self)(self.minmu, self.theta)#, -self.pow)
+        return type(self)(self.minmu, self.theta)
 
 
 class ToSpherical(Transform):
@@ -283,17 +265,17 @@ class ToSpherical(Transform):
 
     def __call__(self, *args):
         if not self.inv:
-            x, y, z = args[:3]
+            x, y, z = args
             theta = np.arcsin(y) * 180 / np.pi
             phi = np.arctan2(x, z) * 180 / np.pi % 360
-            return (theta, phi) + args[3:]
+            return theta, phi
         else:
-            theta, phi = args[:2]
+            theta, phi = args
             y = np.sin(theta * np.pi / 180)
             a = np.sqrt(1 - y ** 2)
             x, z = (a * np.sin(phi * np.pi / 180),
                     a * np.cos(phi * np.pi / 180))
-            return (x, y, z) + args[2:]
+            return x, y, z
 
     def __repr__(self):
         return f'ToSpherical(inv:{self.inv})'
@@ -307,19 +289,51 @@ class Sine(Transform):
     def __init__(self, inv=False):
         self.inv = inv
 
-    def __call__(self, *args):
+    def __call__(self, theta, phi):
         if not self.inv:
-            theta, phi = args[:2]
             theta = np.sin(theta * np.pi / 180) * 90
-            return (theta, phi) + args[2:]
+            return theta, phi
         else:
-            theta, phi = args[:2]
             theta = np.arcsin(theta / 90) * 180 / np.pi
-            return (theta, phi) + args[2:]
+            return theta, phi
 
     def __repr__(self):
         return f'Sine(inv:{self.inv})'
 
     def __invert__(self):
         return Sine(not self.inv)
+
+
+class SwapAxes(Transform):
+
+    def __new__(cls, axis1, axis2):
+        if axis2 == axis1:
+            return Pipe()
+        else:
+            return super().__new__(cls)
+
+    def __init__(self, axis1=0, axis2=1):
+        self.axis1 = min(axis1, axis2)
+        self.axis2 = max(axis1, axis2)
+
+    def __call__(self, *args):
+        return args[:self.axis1] + (args[self.axis2],) + args[self.axis1 + 1: self.axis2] + (args[self.axis1],) + args[self.axis2 + 1:]
+
+    @classmethod
+    def xy(cls):
+        return cls(axis1=0, axis2=1)
+
+    @classmethod
+    def yz(cls):
+        return cls(axis1=1, axis2=2)
+
+    @classmethod
+    def xz(cls):
+        return cls(axis1=0, axis2=2)
+
+    def __repr__(self):
+        return f'SwapAxes(axis1:{self.axis1}, axis2:{self.axis2})'
+
+    def __invert__(self):
+        return self
 

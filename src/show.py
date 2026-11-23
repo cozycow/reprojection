@@ -46,9 +46,9 @@ def plot(x, y, ax, lim=50, label=None, bbox=None, **kwargs):
         ax.plot(x, y, **kwargs)
 
         if dl[t] > lim:
-            ax.annotate(label, (x[0], y[0]), color='black', alpha=1, size=7,
+            ax.annotate(label, (x[0], y[0]), color='black', alpha=1, size=8,
                         ha='center', va='center', bbox=bbox)
-            ax.annotate(label, (x[-1], y[-1]), color='black', alpha=1, size=7,
+            ax.annotate(label, (x[-1], y[-1]), color='black', alpha=1, size=8,
                         ha='center', va='center', bbox=bbox)
 
 
@@ -75,7 +75,7 @@ def draw_colorbar(fig, ax, im, label=None, loc='upper right'):
     fig.colorbar(im, cax=cax, orientation='horizontal', label=label)
 
 
-def show_data(data, view, title=None, label=None, dpi=120, cmap='seismic', vmin=-200, vmax=200,
+def show_data(data, view, title=None, label=None, dpi=100, cmap='seismic', vmin=-200, vmax=200,
               grid_alpha=0.5, grid_color='black', cbloc='upper right',
               to_file=None, to_folder=None):
 
@@ -119,8 +119,8 @@ def show_data(data, view, title=None, label=None, dpi=120, cmap='seismic', vmin=
             theta0 = 0.
         else:
             theta0 = -89.9
-            ax.set_xlabel('Longitude, deg', labelpad=10)
-            ax.set_ylabel('Latitude, deg', labelpad=10)
+            ax.set_xlabel('Carrington Longitude', labelpad=10)
+            ax.set_ylabel('Carrington Latitude', labelpad=10)
 
         cut_labels = False
         ha, va = 'right', 'top'
@@ -138,21 +138,21 @@ def show_data(data, view, title=None, label=None, dpi=120, cmap='seismic', vmin=
     transform = ~view.transform
     for phi in range(0,360,15):
         theta = np.arange(-90,91)
-        grid = transform(theta, phi * np.ones_like(theta))#, 1)
+        grid = transform(theta, phi * np.ones_like(theta))
         plot(grid[1], grid[0], ax, color=grid_color, ls='--', lw=0.5, alpha=grid_alpha)
-        grid = transform(theta0, phi)#, 1)
+        grid = transform(theta0, phi)
 
-        ax.annotate(str(phi) if phi != 0 else None, (grid[1], grid[0]),
-                    size=7, ha=ha, va=va, bbox=bbox)
+        ax.annotate(rf'{phi}$^\circ$' if phi != 0 else None, (grid[1], grid[0]),
+                    size=8, ha=ha, va=va, bbox=bbox)
 
     for theta in range(-90,91,15):
         phi = np.arange(0,360)
-        grid = transform(theta * np.ones_like(phi), phi)#, 1)
+        grid = transform(theta * np.ones_like(phi), phi)
         plot(grid[1], grid[0], ax, color=grid_color, ls='--', lw=0.5, alpha=grid_alpha,
-             label=str(theta) if cut_labels and theta != 0 else None, bbox=bbox)
+             label=rf'{theta}$^\circ$' if cut_labels and theta != 0 else None, bbox=bbox)
 
-        ax.annotate(str(theta), (grid[1][0], grid[0][0]),
-                    size=7, ha=ha, va=va, bbox=bbox)
+        ax.annotate(rf'{theta}$^\circ$', (grid[1][0], grid[0][0]),
+                    size=8, ha=ha, va=va, bbox=bbox)
 
     draw_colorbar(fig, ax, image, label=label, loc=cbloc)
     plt.tight_layout()

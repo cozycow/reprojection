@@ -26,7 +26,7 @@ class DiffRotate(Transform):
     def __repr__(self):
         return f'CorrectDR()'
 
-    def __call__(self, theta, phi, alpha):
+    def __call__(self, theta, phi):
         from datetime import datetime
         cdn = (datetime.fromisoformat(self.date) -
               datetime.fromisoformat(self.epoch)).total_seconds() / 24 / 3600
@@ -38,12 +38,12 @@ class DiffRotate(Transform):
             crn = (phi0 - delta) / 360
             t = np.where(np.any([crn < self.crn,
                                  crn >= self.crn + 1], axis=0))
-            theta[t], phi[t], alpha[t] = np.nan, np.nan, np.nan
+            theta[t], phi[t] = np.nan, np.nan
 
         time = delta / self.wsyn
         w = diff_rot(theta, **self.kwargs) - WSID
         dphi = w * time
-        return theta, phi + dphi, alpha
+        return theta, phi + dphi
 
     def __invert__(self):
         return self

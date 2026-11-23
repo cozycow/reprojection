@@ -53,7 +53,7 @@ class ViewBase(ABC):
         image_ = map_coordinates(np.nan_to_num(image), grid, cval=np.nan)
 
         if full_output:
-            return image_#np.array([image_, xi, yi, alpha])
+            return np.concat([np.expand_dims(image_, 0), np.array(grid)], axis=0)
         else:
             return image_
 
@@ -71,6 +71,9 @@ class Map(ViewBase):
 
         if self.sine:
             transform -= Sine()
+
+        if self.cassini:
+            transform += ~ToSpherical() + SwapAxes.xy() + ToSpherical()
 
         return transform
 
@@ -244,11 +247,6 @@ class View(ViewBase):
         return WSID - wobs
 
     @property
-    def _crln(self):
-        tdel = (AU - self.dsun) / CLIGHT / 24 / 3600
-        return self.crln + tdel * WSID
-
-    @property
     def mean_crln(self):
         a, e, theta = self.keplerian_elements
         M = self.mean_anomaly
@@ -261,20 +259,24 @@ class View(ViewBase):
     @property
     def transform(self):
         return (Normalize((self.xc, self.yc), (self.rsun, self.rsun)) +
+                SwapAxes.xy() +
                 To3d() +
                 ToParaxial(self.rsun_deg) +
                 MuFilter(self.minmu, self.rsun_deg) +
                 Rotate.z(self.crota) -
                 Rotate.x(self.crlt) +
-                Rotate.y(self._crln) +
+                Rotate.y(self.crln + (AU - self.dsun) / CLIGHT / 24 / 3600 * WSID) +
                 ToSpherical())
+
+    def get_mu(self, x, y):
+        transform = Normalize((self.xc, self.yc), (self.rsun, self.rsun)) + To3d()
+        _, _, z = transform(x, y)
+        q = np.sin(self.rsun_deg * np.pi / 180)
+        return z * np.sqrt(1 - q ** 2) / np.sqrt(1 - (q * z) ** 2)
 
     @property
     def mu(self):
-        transform = Normalize((self.xc, self.yc), (self.rsun, self.rsun)) + To3d()
-        _, _, zi = transform(*self.grid)
-        q = np.sin(self.rsun_deg * np.pi / 180)
-        return zi * np.sqrt(1 - q ** 2) / np.sqrt(1 - (q * zi) ** 2)
+        return self.get_mu(*self.grid)
 
     def radialize(self, data):
         return data / self.mu

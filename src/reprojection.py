@@ -3,6 +3,7 @@ from astropy.io import fits
 from view import View, Map
 from diff_rot import *
 
+
 def reproject(data, header,
               header_new=None,
               kind='',
@@ -102,9 +103,9 @@ def make_map(files,
         if view_out is None:
             view_out = view.copy()
 
-        data, x, y, alpha = data
-        data /= alpha
-        z = 1 / alpha
+        data, x, y = data
+        z = View.from_header(header).get_mu(x, y)
+        data *= z
         n = (~np.isnan(data)).astype(float)
 
         N += np.nan_to_num(n)
