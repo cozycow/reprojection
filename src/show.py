@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Circle, Rectangle
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from transforms import ToSpherical
-from view import *
+from reprojection import *
 
 
 def _plot(x, y, ax, lim=50, label=None, bbox=None, **kwargs):

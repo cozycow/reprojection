@@ -6,7 +6,6 @@ from diff_rot import *
 
 
 WSID = 360 / 25.38
-ALPHA = 1.327124e20
 AU = 149597870691.
 CLIGHT = 299792458
 
@@ -59,6 +58,7 @@ class ViewBase(ABC):
 
 
 class Map(ViewBase):
+
     def __init__(self, nx, ny, sine=True, cassini=False):
         self.nx = nx
         self.ny = ny
@@ -83,7 +83,8 @@ class Map(ViewBase):
         return grid
 
 
-class View(ViewBase):
+class SunView(ViewBase):
+
     def __init__(self, nx, ny, xc, yc, rsun, crota, crlt, crln,
                  vr=0., vw=0., vn=0., rsun_deg=0., dsun=AU, date='', minmu=0.):
         '''
@@ -218,45 +219,6 @@ class View(ViewBase):
         return grid
 
     @property
-    def keplerian_elements(self):
-        vt = np.sqrt(self.vw ** 2 + self.vn ** 2)
-        p = (self.dsun * vt) ** 2 / ALPHA
-        v0 = np.sqrt(ALPHA / p)
-        e = np.sqrt((vt / v0 - 1) ** 2 + (self.vr / v0) ** 2)
-        a = p / (1 - e ** 2)
-        theta = np.arctan2(self.vr, vt - v0) * 180 / np.pi % 360
-        return a, e, theta
-
-    @property
-    def ecc_anomaly(self):
-        a, e, theta = self.keplerian_elements
-        cos_f = np.cos(theta * np.pi / 180)
-        sin_f = np.sin(theta * np.pi / 180)
-        return np.arctan2(np.sqrt(1 - e ** 2) * sin_f, e + cos_f) * 180 / np.pi
-
-    @property
-    def mean_anomaly(self):
-        a, e, theta = self.keplerian_elements
-        E = self.ecc_anomaly
-        return E - e * np.sin(E * np.pi / 180) * 180 / np.pi
-
-    @property
-    def wsyn(self):
-        a, e, theta = self.keplerian_elements
-        wobs = np.sqrt(ALPHA / a ** 3) * 180 / np.pi * 24 * 3600
-        return WSID - wobs
-
-    @property
-    def mean_crln(self):
-        a, e, theta = self.keplerian_elements
-        M = self.mean_anomaly
-
-        axis_obs = (-self.vn, self.vw, 0)
-        rot = Rotate.from_axis_angle(axis_obs, -theta) - Rotate.x(self.crlt) + Rotate.y(self.crln)
-        r = rot(0, 0, 1)
-        return (M + np.arctan2(r[0], r[2]) * 180 / np.pi) % 360
-
-    @property
     def transform(self):
         return (Normalize((self.xc, self.yc), (self.rsun, self.rsun)) +
                 SwapAxes.xy() +
@@ -267,20 +229,4 @@ class View(ViewBase):
                 Rotate.x(self.crlt) +
                 Rotate.y(self.crln + (AU - self.dsun) / CLIGHT / 24 / 3600 * WSID) +
                 ToSpherical())
-
-    def get_mu(self, x, y):
-        transform = Normalize((self.xc, self.yc), (self.rsun, self.rsun)) + To3d()
-        _, _, z = transform(x, y)
-        q = np.sin(self.rsun_deg * np.pi / 180)
-        return z * np.sqrt(1 - q ** 2) / np.sqrt(1 - (q * z) ** 2)
-
-    @property
-    def mu(self):
-        return self.get_mu(*self.grid)
-
-    def radialize(self, data):
-        return data / self.mu
-
-    def deradialize(self, data):
-        return data * self.mu
 
