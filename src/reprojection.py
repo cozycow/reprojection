@@ -27,9 +27,7 @@ def reproject(data, header,
         rsun = 0.45 * nx
 
         view_new.update(inplace=True, nx=nx, ny=ny, xc=xc, yc=yc, rsun=rsun, rsun_deg=0,
-                        crota=-90, crlt=90, crln=0, minmu=-1e-8, powmu=1.)
-        #view_new = View(nx, ny, xc, yc, rsun, -90, 90, 0,
-        #                vw=np.inf, date=view.date, minmu=-1e-8, powmu=1.)
+                        crota=-90, crlt=90, crln=0, minmu=-1e-8)
 
     elif kind == 'south':
         nx, ny = 1024, 1024
@@ -37,9 +35,7 @@ def reproject(data, header,
         rsun = 0.45 * nx
 
         view_new.update(inplace=True, nx=nx, ny=ny, xc=xc, yc=yc, rsun=rsun, rsun_deg=0,
-                        crota=90, crlt=-90, crln=0, minmu=-1e-8, powmu=1.)
-        #view_new = View(nx, ny, xc, yc, rsun, 90, -90, 0,
-        #                vw=np.inf, date=view.date, minmu=-1e-8, powmu=1.)
+                        crota=90, crlt=-90, crln=0, minmu=-1e-8)
 
     elif kind == 'warp':
         nx, ny = 1024, 1024
@@ -47,17 +43,18 @@ def reproject(data, header,
         rsun = 0.45 * nx
 
         view_new.update(inplace=True, nx=nx, ny=ny, xc=xc, yc=yc, rsun=rsun,
-                        crota=0, crlt=0, crln=0, minmu=-1e-8, powmu=1.,
+                        crota=0, crlt=0, crln=0, minmu=-1e-8,
                         rsun_deg=-45)
-        #view_new = View(nx, ny, xc, yc, rsun, 0, 0, 0,
-        #                rsun_deg=-45, vw=np.inf, date=view.date, powmu=1.)
 
     Q = []
     if correct_dr:
         Q += [DiffRotate(view.date, car_rot, wsyn=view.wsyn, epoch='20260710T030009', crln0=207.18, **kwargs)]
 
     view_new.update(inplace=True, **kwargs)
-    data_ = view_new.reproject(data, view.update(minmu=minmu), *Q, **kwargs)
+    data_ = view_new.reproject(view.radialize(data), view.update(minmu=minmu), *Q, **kwargs)
+
+    if kind == 'north' or kind == 'south':
+        data_ = view_new.deradialize(data_)
 
     return data_, view_new
 

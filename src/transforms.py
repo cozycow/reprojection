@@ -201,6 +201,13 @@ class To3d(Transform):
             return (x, y, z) + args[2:]
         else:
             x, y, z = args[:3]
+
+            #if isinstance(z, np.ndarray) and len(z) > 0:
+            #    t = np.where(z < -1e-16)
+            #    x[t], y[t], z[t] = np.nan, np.nan, np.nan
+            #elif z < -1e-16:
+            #    x, y, z = np.nan, np.nan, np.nan
+
             return (y, x) + args[3:]
 
     def __invert__(self):
@@ -245,28 +252,28 @@ class ToParaxial(Transform):
 
 class MuFilter(Transform):
 
-    def __init__(self, minmu=0., theta=0., pow=1.):
+    def __init__(self, minmu=0., theta=0.):#, pow=1.):
         self.minmu = minmu
         self.theta = theta
-        self.pow = pow
+        #self.pow = pow
 
     def __repr__(self):
-        return f'MuFilter(pow:{self.pow})'
+        return f'MuFilter()'
 
-    def __call__(self, x, y, z, alpha):
+    def __call__(self, x, y, z):
         q = np.sin(self.theta * np.pi / 180)
         mu = (z - q) / np.sqrt(q ** 2 - 2 * q * z + 1)
 
         if isinstance(mu, np.ndarray) and len(mu) > 0:
             t = np.where(mu < self.minmu)
-            x[t], y[t], z[t], mu[t] = np.nan, np.nan, np.nan, np.nan
+            x[t], y[t], z[t] = np.nan, np.nan, np.nan
         elif mu < self.minmu:
-            x, y, z, mu = np.nan, np.nan, np.nan, np.nan
+            x, y, z = np.nan, np.nan, np.nan
 
-        return x, y, z, alpha * mu ** self.pow
+        return x, y, z
 
     def __invert__(self):
-        return type(self)(self.minmu, self.theta, -self.pow)
+        return type(self)(self.minmu, self.theta)#, -self.pow)
 
 
 class ToSpherical(Transform):

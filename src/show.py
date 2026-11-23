@@ -138,16 +138,16 @@ def show_data(data, view, title=None, label=None, dpi=120, cmap='seismic', vmin=
     transform = ~view.transform
     for phi in range(0,360,15):
         theta = np.arange(-90,91)
-        grid = transform(theta, phi * np.ones_like(theta), 1)
+        grid = transform(theta, phi * np.ones_like(theta))#, 1)
         plot(grid[1], grid[0], ax, color=grid_color, ls='--', lw=0.5, alpha=grid_alpha)
-        grid = transform(theta0, phi, 1)
+        grid = transform(theta0, phi)#, 1)
 
         ax.annotate(str(phi) if phi != 0 else None, (grid[1], grid[0]),
                     size=7, ha=ha, va=va, bbox=bbox)
 
     for theta in range(-90,91,15):
         phi = np.arange(0,360)
-        grid = transform(theta * np.ones_like(phi), phi, 1)
+        grid = transform(theta * np.ones_like(phi), phi)#, 1)
         plot(grid[1], grid[0], ax, color=grid_color, ls='--', lw=0.5, alpha=grid_alpha,
              label=str(theta) if cut_labels and theta != 0 else None, bbox=bbox)
 

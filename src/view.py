@@ -48,14 +48,12 @@ class ViewBase(ABC):
 
     def reproject(self, image, view, *args, full_output=False, **kwargs):
         transform = (self.transform + Pipe(*args) - view.transform)
-        xi, yi = self.grid
-        alpha = np.ones_like(xi)
-        xi, yi, alpha = transform(xi, yi, alpha)
+        grid = transform(*self.grid)
 
-        image_ = map_coordinates(np.nan_to_num(image), (xi, yi), cval=np.nan) * alpha
+        image_ = map_coordinates(np.nan_to_num(image), grid, cval=np.nan)
 
         if full_output:
-            return np.array([image_, xi, yi, alpha])
+            return image_#np.array([image_, xi, yi, alpha])
         else:
             return image_
 
@@ -84,7 +82,7 @@ class Map(ViewBase):
 
 class View(ViewBase):
     def __init__(self, nx, ny, xc, yc, rsun, crota, crlt, crln,
-                 vr=0., vw=0., vn=0., rsun_deg=0., dsun=AU, date='', minmu=0., powmu=0.):
+                 vr=0., vw=0., vn=0., rsun_deg=0., dsun=AU, date='', minmu=0.):
         '''
         A WCS information container.
         '''
@@ -103,7 +101,6 @@ class View(ViewBase):
         self.dsun = dsun
         self.date = date
         self.minmu = minmu
-        self.powmu = powmu
 
 
     @classmethod
@@ -166,7 +163,7 @@ class View(ViewBase):
         else:
             date = ''
 
-        return cls(nx, ny, xc, yc, rsun, crota, crlt, crln, vr, vw, vn, rsun_deg, dsun, date, 0., 1.)
+        return cls(nx, ny, xc, yc, rsun, crota, crlt, crln, vr, vw, vn, rsun_deg, dsun, date, 0)
 
     def update_header(self, header, inplace=False):
         '''
@@ -266,9 +263,22 @@ class View(ViewBase):
         return (Normalize((self.xc, self.yc), (self.rsun, self.rsun)) +
                 To3d() +
                 ToParaxial(self.rsun_deg) +
-                MuFilter(self.minmu, self.rsun_deg, self.powmu) +
+                MuFilter(self.minmu, self.rsun_deg) +
                 Rotate.z(self.crota) -
                 Rotate.x(self.crlt) +
                 Rotate.y(self._crln) +
                 ToSpherical())
+
+    @property
+    def mu(self):
+        transform = Normalize((self.xc, self.yc), (self.rsun, self.rsun)) + To3d()
+        _, _, zi = transform(*self.grid)
+        q = np.sin(self.rsun_deg * np.pi / 180)
+        return zi * np.sqrt(1 - q ** 2) / np.sqrt(1 - (q * zi) ** 2)
+
+    def radialize(self, data):
+        return data / self.mu
+
+    def deradialize(self, data):
+        return data * self.mu
 
