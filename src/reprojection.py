@@ -1,6 +1,32 @@
 import numpy as np
-from view import Map, SunView
+from view import ViewBase, SunView
 from diff_rot import *
+
+
+class Map(ViewBase):
+
+    def __init__(self, nx, ny, sine=True, cassini=False):
+        self.nx = nx
+        self.ny = ny
+        self.sine = sine
+        self.cassini = cassini
+
+    @property
+    def transform(self):
+        transform = Normalize(((self.nx - 1) / 2, 0), ((self.nx - 1) / 180, self.ny / 360))
+
+        if self.sine:
+            transform -= Sine()
+
+        if self.cassini:
+            transform += ~ToSpherical() + SwapAxes.xy() + ToSpherical()
+
+        return transform
+
+    @property
+    def grid(self):
+        grid = tuple(np.mgrid[:self.nx, :self.ny].astype(np.float32))
+        return grid
 
 
 class View(SunView):
@@ -55,8 +81,12 @@ def reproject(data, header,
         view_new = view.copy()
 
     Q = []
+
+    if car_rot is not None:
+        Q += [FilterRotation(view.date, car_rot, **kwargs)]
+
     if correct_dr:
-        Q += [DiffRotate(view.date, car_rot, wsyn=view.wsyn, epoch='20260710T030009', crln0=207.18, **kwargs)]
+        Q += [DiffRotate(view.date, **kwargs)]
 
     view_new.update(inplace=True, **kwargs)
     data_ = view_new.reproject(view.radialize(data), view.update(minmu=minmu), *Q, **kwargs)

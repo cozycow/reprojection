@@ -9,6 +9,7 @@ AU = 149597870691.
 CLIGHT = 299792458
 ALPHA = 1.327124e20
 
+
 class ViewBase(ABC):
 
     @abstractmethod
@@ -54,32 +55,6 @@ class ViewBase(ABC):
             return np.concat([np.expand_dims(image_, 0), np.array(grid)], axis=0)
         else:
             return image_
-
-
-class Map(ViewBase):
-
-    def __init__(self, nx, ny, sine=True, cassini=False):
-        self.nx = nx
-        self.ny = ny
-        self.sine = sine
-        self.cassini = cassini
-
-    @property
-    def transform(self):
-        transform = Normalize(((self.nx - 1) / 2, 0), ((self.nx - 1) / 180, self.ny / 360))
-
-        if self.sine:
-            transform -= Sine()
-
-        if self.cassini:
-            transform += ~ToSpherical() + SwapAxes.xy() + ToSpherical()
-
-        return transform
-
-    @property
-    def grid(self):
-        grid = tuple(np.mgrid[:self.nx, :self.ny].astype(np.float32))
-        return grid
 
 
 class SunView(ViewBase):
