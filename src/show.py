@@ -2,31 +2,9 @@ import numpy as np
 import glob
 from os import path
 import matplotlib.pyplot as plt
-from matplotlib.patches import Circle, Rectangle
+from matplotlib.patches import Circle
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
-from transforms import ToSpherical
 from reprojection import *
-
-
-def _plot(x, y, ax, lim=50, label=None, bbox=None, **kwargs):
-    x = x[~np.isnan(x)]
-    y = y[~np.isnan(y)]
-
-    dx = x[1:] - x[:-1]
-    dy = y[1:] - y[:-1]
-    dl = np.sqrt(dx ** 2 + dy ** 2)
-    t = np.where(dl > lim)[0]
-
-    if len(t) > 0:
-        plot(x[:t[0] + 1], y[:t[0] + 1], ax, **kwargs)
-        plot(x[t[0] + 1:], y[t[0] + 1:], ax, **kwargs)
-
-        ax.annotate(label, (x[t[0]], y[t[0]]), color='black', alpha=1, size=7,
-                    ha='center', va='center', bbox=bbox)
-        ax.annotate(label, (x[t[0] + 1], y[t[0] + 1]), color='black', alpha=1, size=7,
-                    ha='center', va='center', bbox=bbox)
-    else:
-        ax.plot(x, y, **kwargs)
 
 
 def plot(x, y, ax, lim=50, label=None, bbox=None, **kwargs):
@@ -54,7 +32,7 @@ def plot(x, y, ax, lim=50, label=None, bbox=None, **kwargs):
 
 
 def draw_colorbar(fig, ax, im, label=None, loc='upper right'):
-    cbbox = inset_axes(ax, width=1.5, height=0.6, loc=loc)
+    cbbox = inset_axes(ax, width=2, height=0.6, loc=loc)
 
     [cbbox.spines[k].set_visible(False) for k in cbbox.spines]
     cbbox.tick_params(
@@ -70,12 +48,12 @@ def draw_colorbar(fig, ax, im, label=None, loc='upper right'):
     )
 
     cbbox.set_facecolor((1, 1, 1, 0.7))
-    cax = cbbox.inset_axes((0.05, 0.7, 0.9, 0.15))
+    cax = cbbox.inset_axes((0.1, 0.7, 0.8, 0.15))
     cax.tick_params(labelsize=8)
     fig.colorbar(im, cax=cax, orientation='horizontal', label=label)
 
 
-def show_data(data, view, title=None, label=None, dpi=100, cmap='seismic', vmin=-200, vmax=200,
+def show_data(data, view, title=None, label=None, dpi=120, cmap='seismic', vmin=-200, vmax=200,
               grid_alpha=0.5, grid_color='black', cbloc='upper right',
               to_file=None, to_folder=None):
 
@@ -89,6 +67,8 @@ def show_data(data, view, title=None, label=None, dpi=100, cmap='seismic', vmin=
         ax.set_title(view.date, size=16)
 
     image = ax.imshow(data, origin='lower', cmap=cmap, vmin=vmin, vmax=vmax)
+    ax.set_xlim(0, view.ny)
+    ax.set_ylim(0, view.nx)
 
 
     if isinstance(view, View):
@@ -96,6 +76,10 @@ def show_data(data, view, title=None, label=None, dpi=100, cmap='seismic', vmin=
         ax.add_patch(Circle((view.yc, view.xc), radius=view.rsun, color='black', lw=0.5, fill=False)) # limb
 
         theta0 = 0.
+        phi_ticks = np.arange(15, 360, 15)
+        phi0 = 0.
+        theta_ticks = np.arange(-90, 91, 15)
+
         cut_labels = True
         ha, va = 'center', 'center'
         bbox = dict(boxstyle='square,pad=0.', facecolor='white', edgecolor='white', alpha=0.7)
@@ -117,10 +101,14 @@ def show_data(data, view, title=None, label=None, dpi=100, cmap='seismic', vmin=
 
         if view.cassini:
             theta0 = 0.
+            phi0 = 180.
         else:
-            theta0 = -89.9
+            theta0 = -90
+            phi0 = 0.
             ax.set_xlabel('Carrington Longitude', labelpad=10)
-            ax.set_ylabel('Carrington Latitude', labelpad=10)
+            ax.set_ylabel('Carrington Latitude', labelpad=15)
+        phi_ticks = np.arange(15, 361, 15)
+        theta_ticks = np.arange(-90, 91, 15)
 
         cut_labels = False
         ha, va = 'right', 'top'
@@ -131,27 +119,33 @@ def show_data(data, view, title=None, label=None, dpi=100, cmap='seismic', vmin=
 
     else:
         theta0 = np.nan
+        phi0 = np.nan
+        phi_ticks = []
+        theta_ticks = []
         cut_labels = False
         ha, va = 'right', 'top'
         bbox = dict(facecolor='white', edgecolor='white', alpha=0.)
 
     transform = ~view.transform
     for phi in range(0,360,15):
-        theta = np.arange(-90,91)
+        theta = np.arange(-90,90.05, 0.1)
         grid = transform(theta, phi * np.ones_like(theta))
         plot(grid[1], grid[0], ax, color=grid_color, ls='--', lw=0.5, alpha=grid_alpha)
-        grid = transform(theta0, phi)
-
-        ax.annotate(rf'{phi}$^\circ$' if phi != 0 else None, (grid[1], grid[0]),
-                    size=8, ha=ha, va=va, bbox=bbox)
 
     for theta in range(-90,91,15):
-        phi = np.arange(0,360)
+        phi = np.arange(0,360.05, 0.1)
         grid = transform(theta * np.ones_like(phi), phi)
         plot(grid[1], grid[0], ax, color=grid_color, ls='--', lw=0.5, alpha=grid_alpha,
              label=rf'{theta}$^\circ$' if cut_labels and theta != 0 else None, bbox=bbox)
 
-        ax.annotate(rf'{theta}$^\circ$', (grid[1][0], grid[0][0]),
+    for phi in phi_ticks:
+        grid = transform(theta0, phi)
+        ax.annotate(rf'{phi}$^\circ$', (grid[1], grid[0]),
+                    size=8, ha=ha, va=va, bbox=bbox)
+
+    for theta in theta_ticks:
+        grid = transform(theta, phi0)
+        ax.annotate(rf'{theta}$^\circ$', (grid[1], grid[0]),
                     size=8, ha=ha, va=va, bbox=bbox)
 
     draw_colorbar(fig, ax, image, label=label, loc=cbloc)
