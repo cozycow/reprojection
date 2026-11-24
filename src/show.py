@@ -7,28 +7,32 @@ from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from reprojection import *
 
 
-def plot(x, y, ax, lim=50, label=None, bbox=None, **kwargs):
-    x = x[~np.isnan(x)]
-    y = y[~np.isnan(y)]
+def plot(x, y, ax, lim=10, label=None, bbox=None, **kwargs):
+    dx = x[1:] - x[:-1]
+    dy = y[1:] - y[:-1]
+    dl = np.sqrt(dx ** 2 + dy ** 2)
 
-    if len(x) > 1:
+    p = np.where(dl > lim)[0]
+    if len(p) > 0:
+        plot(x[:p[0]], y[:p[0]], ax, lim=lim, label=label, bbox=bbox, **kwargs)
+        plot(x[p[0] + 1:], y[p[0] + 1:], ax, lim=lim, label=label, bbox=bbox, **kwargs)
+    else:
+        t = np.where(np.isnan(dl))[0]
+        if len(t) > 1:
+            t1 = np.min(t)
+            t2 = np.max(t)
 
-        dx = np.roll(x, -1) - x
-        dy = np.roll(y, -1) - y
-        dl = np.sqrt(dx ** 2 + dy ** 2)
+            if t1 > 0:
+                ax.annotate(label, (x[t1 - 1], y[t1 - 1]), color='black', alpha=1, size=8,
+                            ha='center', va='center', bbox=bbox)
+            if t2 < len(x) - 1:
+                ax.annotate(label, (x[t2 + 1], y[t2 + 1]), color='black', alpha=1, size=8,
+                            ha='center', va='center', bbox=bbox)
 
-        t = int(np.argmax(dl))
-        x = np.roll(x, -t - 1)
-        y = np.roll(y, -t - 1)
-
-        ax.plot(x, y, **kwargs)
-
-        if dl[t] > lim:
-            ax.annotate(label, (x[0], y[0]), color='black', alpha=1, size=8,
-                        ha='center', va='center', bbox=bbox)
-            ax.annotate(label, (x[-1], y[-1]), color='black', alpha=1, size=8,
-                        ha='center', va='center', bbox=bbox)
-
+            plt.plot(x[:t1], y[:t1], **kwargs)
+            plt.plot(x[t2 + 1:], y[t2 + 1:], **kwargs)
+        else:
+            plt.plot(x, y, **kwargs)
 
 
 def draw_colorbar(fig, ax, im, label=None, loc='upper right'):
@@ -102,13 +106,16 @@ def show_data(data, view, title=None, label=None, dpi=120, cmap='seismic', vmin=
         if view.cassini:
             theta0 = 0.
             phi0 = 180.
+            phi_ticks = np.arange(0, 360, 15)
+            phi_ticks = phi_ticks[phi_ticks != 180]
+            theta_ticks = np.arange(-90, 91, 15)
         else:
             theta0 = -90
             phi0 = 0.
             ax.set_xlabel('Carrington Longitude', labelpad=10)
             ax.set_ylabel('Carrington Latitude', labelpad=15)
-        phi_ticks = np.arange(15, 361, 15)
-        theta_ticks = np.arange(-90, 91, 15)
+            phi_ticks = np.arange(15, 361, 15)
+            theta_ticks = np.arange(-90, 91, 15)
 
         cut_labels = False
         ha, va = 'right', 'top'
