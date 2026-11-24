@@ -45,7 +45,7 @@ class ViewBase(ABC):
     def transform(self, **kwargs):
         pass
 
-    def reproject(self, image, view, *args, full_output=False, **kwargs):
+    def reproject(self, image, view, *args, full_output=False):
         transform = (self.transform + Pipe(*args) - view.transform)
         grid = transform(*self.grid)
 

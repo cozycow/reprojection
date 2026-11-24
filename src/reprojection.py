@@ -66,6 +66,7 @@ def reproject(data, header,
               minmu=0.1,
               car_rot=None,
               correct_dr=False,
+              full_output=False,
               **kwargs):
 
     view = View.from_header(header)
@@ -89,10 +90,17 @@ def reproject(data, header,
         Q += [DiffRotate(view.date, **kwargs)]
 
     view_new.update(inplace=True, **kwargs)
-    data_ = view_new.reproject(view.radialize(data), view.update(minmu=minmu), *Q, **kwargs)
+    data_ = view_new.reproject(view.radialize(data), view.update(minmu=minmu), *Q, full_output=full_output)
 
     if kind == 'north' or kind == 'south':
-        data_ = view_new.deradialize(data_)
+        if full_output:
+            data_[0] = view_new.deradialize(data_[0])
+        else:
+            data_ = view_new.deradialize(data_)
+
+    if full_output:
+        mu = view.get_mu(data_[1], data_[2])
+        data_ = np.concat([data_, np.expand_dims(mu, 0)], axis=0)
 
     return data_, view_new
 
