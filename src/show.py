@@ -2,9 +2,18 @@ import numpy as np
 import glob
 from os import path
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 from matplotlib.patches import Circle
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from reprojection import *
+
+
+cmap_c = plt.cm.bwr(np.linspace(0, 1, 100))
+cmap_c[40:50] = cmap_c[40]
+cmap_c[50:60] = cmap_c[60]
+cmap_l = plt.cm.winter_r(np.linspace(0, 1, 50))
+cmap_r = plt.cm.autumn(np.linspace(0, 1, 50))
+cmap_combined = mcolors.LinearSegmentedColormap.from_list('my_colormap', np.vstack((cmap_l, cmap_c, cmap_r)))
 
 
 def plot(x, y, ax, lim=10, label=None, bbox=None, **kwargs):
@@ -57,9 +66,11 @@ def draw_colorbar(fig, ax, im, label=None, loc='upper right'):
     fig.colorbar(im, cax=cax, orientation='horizontal', label=label)
 
 
-def show_data(data, view, title=None, label=None, dpi=120, cmap='seismic', vmin=-200, vmax=200,
+def show_data(data, view, title=None, label=None, dpi=120,
+              cmap=cmap_combined, norm=mcolors.SymLogNorm(linthresh=10, linscale=1, vmin=-100, vmax=100),
               grid_alpha=0.5, grid_color='black', cbloc='upper right',
-              to_file=None, to_folder=None):
+              to_file=None, to_folder=None,
+              **kwargs):
 
     if to_file is not None or to_folder is not None:
         plt.ioff()
@@ -70,7 +81,7 @@ def show_data(data, view, title=None, label=None, dpi=120, cmap='seismic', vmin=
     elif 'date' in view.__dict__:
         ax.set_title(view.date, size=16)
 
-    image = ax.imshow(data, origin='lower', cmap=cmap, vmin=vmin, vmax=vmax)
+    image = ax.imshow(data, origin='lower', cmap=cmap, norm=norm, **kwargs)
     ax.set_xlim(0, view.ny)
     ax.set_ylim(0, view.nx)
 
@@ -86,10 +97,10 @@ def show_data(data, view, title=None, label=None, dpi=120, cmap='seismic', vmin=
 
         cut_labels = True
         ha, va = 'center', 'center'
-        bbox = dict(boxstyle='square,pad=0.', facecolor='white', edgecolor='white', alpha=0.7)
+        bbox = dict(boxstyle='square,pad=0.', facecolor='white', edgecolor='white', alpha=0.5)
 
         if label is None:
-            label = r'$B_{los}$, G'
+            label = r'$B_{r}$, G'
 
     elif isinstance(view, Map):
         ax.tick_params(
