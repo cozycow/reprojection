@@ -9,8 +9,8 @@ from reprojection import *
 
 
 cmap_c = plt.cm.bwr(np.linspace(0, 1, 100))
-cmap_c[40:50] = cmap_c[40]
-cmap_c[50:60] = cmap_c[60]
+#cmap_c[43:50] = cmap_c[43]
+#cmap_c[50:57] = cmap_c[56]
 cmap_l = plt.cm.winter_r(np.linspace(0, 1, 50))
 cmap_r = plt.cm.autumn(np.linspace(0, 1, 50))
 cmap_combined = mcolors.LinearSegmentedColormap.from_list('my_colormap', np.vstack((cmap_l, cmap_c, cmap_r)))

@@ -5,9 +5,9 @@ from reprojection import *
 
 def make_map(files,
              correct_crota=True,
-             binning=1,
              correct_bias=False,
              full_output=False,
+             rebin_to_rsun=400,
              **kwargs):
     '''
     Creates an averaged map by applying 'remap' routine to every dataset in files
@@ -34,10 +34,10 @@ def make_map(files,
                 if correct_crota:
                     header['CROTA'] = header['CROTA'] + 0.25 ### crota correction
 
-        #rsun = header['RSUN_ARC'] / header['CDELT1']
-        #binning = int(np.ceil(rsun / 450).clip(1))
-
-        data = rebin(data, binning, update_header=header)
+        if rebin_to_rsun is not None:
+            rsun = header['RSUN_ARC'] / header['CDELT1']
+            binning = max(rsun / rebin_to_rsun, 1.)
+            data = rebin(data, binning, update_header=header)
 
         x0, y0 = header['PXBEG2'] - 1, header['PXBEG1'] - 1
 

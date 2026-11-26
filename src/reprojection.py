@@ -67,6 +67,7 @@ def reproject(data, header,
               car_rot=None,
               correct_dr=False,
               full_output=False,
+              deradialize=False,
               **kwargs):
 
     view = View.from_header(header)
@@ -92,7 +93,7 @@ def reproject(data, header,
     view_new.update(inplace=True, **kwargs)
     data_ = view_new.reproject(view.radialize(data), view.update(minmu=minmu), *Q, full_output=full_output)
 
-    if False:#kind == 'north' or kind == 'south':
+    if deradialize:
         if full_output:
             data_[0] = view_new.deradialize(data_[0])
         else:
