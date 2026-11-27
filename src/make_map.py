@@ -7,7 +7,7 @@ def make_map(files,
              correct_crota=True,
              correct_bias=False,
              full_output=False,
-             rebin_to_rsun=400,
+             rebin_to_rsun=None,#400,
              **kwargs):
     '''
     Creates an averaged map by applying 'remap' routine to every dataset in files
@@ -38,6 +38,9 @@ def make_map(files,
             rsun = header['RSUN_ARC'] / header['CDELT1']
             binning = max(rsun / rebin_to_rsun, 1.)
             data = rebin(data, binning, update_header=header)
+        else:
+            binning = 1
+            data = data
 
         x0, y0 = header['PXBEG2'] - 1, header['PXBEG1'] - 1
 
@@ -45,8 +48,14 @@ def make_map(files,
         if view_out is None:
             view_out = view.copy()
 
+        cdn = (datetime.fromisoformat(header['DATE-OBS']) -
+               datetime.fromisoformat('20260901T000000')).total_seconds() / 24 / 3600
+
         data, x, y, z = data
+        x, y = ((x - 0.5) * binning + 0.5 + x0 - 1024) / 1024, ((y - 0.5) * binning + 0.5 + y0 - 1024) / 1024
         data *= z
+        #data -= x * (-1.81015285) + y * (-0.06079465) -0.42041103
+        #data -= x * (-0.3486008) + y * (-0.23286657) -0.23242867
 
         n = (~np.isnan(data)).astype(float)
 
@@ -62,8 +71,10 @@ def make_map(files,
         LL += np.nan_to_num((ll - LL) * w)
 
         if correct_bias:
-            x, y = (x + x0 - 1024) / 1024, (y + y0 - 1024) / 1024
+            #g = np.moveaxis(np.array([[x ** 2, x * y, y ** 2, x, y, n]]), (0, 1), (-2, -1))
+            #g = np.moveaxis(np.array([[x, y, n * cdn, n]]), (0, 1), (-2, -1))
             g = np.moveaxis(np.array([[x, y, n]]), (0, 1), (-2, -1))
+            #g = np.moveaxis(np.array([[n]]), (0, 1), (-2, -1))
         else:
             g = np.moveaxis(np.array([[n]]), (0, 1), (-2, -1))
 
@@ -76,6 +87,10 @@ def make_map(files,
         LG += np.nan_to_num((lg - LG) * w)
         GF += np.nan_to_num((gf - GF) * w)
         FF += np.nan_to_num((ff - FF) * w)
+
+    N[:50] = 0
+    N[-50:] = 0
+    N[128:-128] = 0
 
     LL[N == 0] = np.nan
     LF[N == 0] = np.nan
@@ -92,11 +107,13 @@ def make_map(files,
 
     if correct_bias:
         R = LLi @ LG
-        D = np.linalg.inv(np.nanmean((GG - GL @ R) / S, axis=(0, 1)))
-        V = np.nanmean((GF - GL @ Q) / S, axis=(0, 1))
+        D = np.linalg.inv(np.nanmean((GG - GL @ R), axis=(0, 1)))
+        V = np.nanmean((GF - GL @ Q), axis=(0, 1))
         P = D @ V
         dQ = R @ P
         Q -= dQ
+
+        print(P)
 
     out = np.squeeze(Q)
     if full_output:
